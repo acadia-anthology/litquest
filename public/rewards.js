@@ -24,7 +24,8 @@ function formatDate(dateStr) {
 }
 
 function rewardLabel(r) {
-  return r.reward_type === "repeat" ? `Every ${r.threshold} pts` : `${r.threshold} pts`;
+  const repeatIcon = r.reward_type === "repeat" ? `<span class="repeat-icon" title="Repeats">🔁</span>` : "";
+  return `${repeatIcon}${r.threshold} pts`;
 }
 
 let unlocked = false;
@@ -80,7 +81,7 @@ function renderTrack(track) {
       .map(
         (r) => `
       <div class="reward-row" data-id="${r.id}">
-        <span class="reward-level">${escapeHtml(rewardLabel(r))}</span>
+        <span class="reward-level">${rewardLabel(r)}</span>
         <span class="reward-emoji">${r.emoji}</span>
         <span class="reward-text">${escapeHtml(r.reward_text)}</span>
         <span class="reward-actions">

@@ -811,8 +811,13 @@ dialog::backdrop {
 .reward-level {
   font-weight: 800;
   color: var(--purple);
-  width: 70px;
+  min-width: 70px;
   white-space: nowrap;
+}
+
+.repeat-icon {
+  font-size: 0.8rem;
+  margin-right: 2px;
 }
 
 .reward-emoji {
