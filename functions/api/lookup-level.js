@@ -27,7 +27,13 @@ export async function onRequestPost(context) {
     return Response.json(toApiShape(await aiFullGuess(env.GROQ_API_KEY, title, author)));
   }
 
-  const levelGuess = await estimateLevel(env.GROQ_API_KEY, book).catch(() => null);
+  // Open Library only ever grounds the page count — it has no genre/audience data.
+  // Wikipedia's lead paragraph usually states the genre directly ("...is a 2024
+  // adult romance novel..."), which is exactly what was missing before this: a
+  // real book_type/complexity classification wasn't grounded by anything at all.
+  const genreHint = await findWikipediaGenreHint(book.title, book.author).catch(() => null);
+
+  const levelGuess = await estimateLevel(env.GROQ_API_KEY, book, genreHint).catch(() => null);
 
   return Response.json(
     toApiShape({
@@ -92,6 +98,37 @@ async function findBook(title, author) {
   };
 }
 
+const WIKI_HEADERS = { "User-Agent": "Litquest/1.0 (family reading app; contact via GitHub)" };
+
+// Wikipedia's lead paragraph almost always states the genre/audience directly
+// (e.g. "...is a 2024 young adult fantasy novel...") — a much stronger signal
+// for book_type/complexity than the AI guessing from title/author alone.
+async function findWikipediaGenreHint(title, author) {
+  const searchQuery = author ? `${title} novel ${author}` : `${title} novel`;
+  const searchRes = await fetch(
+    `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(
+      searchQuery
+    )}&format=json&srlimit=1`,
+    { headers: WIKI_HEADERS }
+  );
+  if (!searchRes.ok) return null;
+  const searchData = await searchRes.json();
+  const pageTitle = searchData?.query?.search?.[0]?.title;
+  if (!pageTitle) return null;
+
+  const extractRes = await fetch(
+    `https://en.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(
+      pageTitle
+    )}&prop=extracts&explaintext=1&exintro=1&redirects=1&format=json`,
+    { headers: WIKI_HEADERS }
+  );
+  if (!extractRes.ok) return null;
+  const extractData = await extractRes.json();
+  const page = Object.values(extractData?.query?.pages ?? {})[0];
+  const extract = page?.extract?.trim();
+  return extract ? extract.slice(0, 600) : null;
+}
+
 async function callGroq(apiKey, prompt) {
   const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
@@ -120,16 +157,20 @@ async function callGroq(apiKey, prompt) {
 // used by both the grounded (Open Library found it) and blind-guess paths.
 const CLASSIFICATION_FIELDS = `- "grade_level": typical US school grade reading level as text, e.g. "4th grade"
 - "grade_level_num": the same thing as a plain number — 0 for Kindergarten, 1-12 for grades 1-12, or null if this is an adult book with no school grade level
-- "book_type": exactly one of "Elementary", "Middle Grade", "YA", or "Adult" (Elementary = K-5, Middle Grade = 6-8, YA = 9-12, Adult = adult fiction/nonfiction not aimed at school grades)
+- "book_type": exactly one of "Elementary", "Middle Grade", "YA", or "Adult" (Elementary = K-5, Middle Grade = 6-8, YA = 9-12, Adult = adult fiction/nonfiction not aimed at school grades). Most published books are Adult — only classify as Elementary/Middle Grade/YA when there's real signal for it (a children's imprint, a known MG/YA author or series, explicit "for kids" framing, or a description below that says so). If you're genuinely unsure and have no such signal, default to "Adult" rather than guessing a kids' category — don't assume a book is for children just because the author has also written children's books elsewhere.
 - "complexity": exactly one of "Light", "Standard", or "Complex" — how demanding this book is FOR AN ADULT READER regardless of its grade level (Light = easy/quick read like a cozy mystery or simple romance; Standard = typical mainstream fiction/genre fiction; Complex = literary fiction, hard sci-fi, dense multi-POV epic fantasy, classics, or anything with intricate prose/structure). A children's book is still "Light" by this scale.`;
 
-async function estimateLevel(apiKey, book) {
+async function estimateLevel(apiKey, book, genreHint) {
   const needsPages = !book.pages;
   const prompt = `This is a real, published book: "${book.title}"${book.author ? ` by ${book.author}` : ""}${
     book.year ? ` (first published ${book.year})` : ""
-  }.
+  }.${
+    genreHint
+      ? `\n\nHere is a real description of it, which may state its genre/audience directly:\n"""\n${genreHint}\n"""`
+      : ""
+  }
 
-Estimate its approximate Lexile measure and classify it. Base it on the book, its genre, and (if you don't know this specific title) its author's similar work — give your best estimate even if you're not 100% certain, approximate is genuinely useful here.${
+Estimate its approximate Lexile measure and classify it. Base it on the description above if given, otherwise the book's genre and (if you don't know this specific title) its author's similar work — give your best estimate even if you're not 100% certain, approximate is genuinely useful here.${
     needsPages ? " Also estimate its typical print page count." : ""
   }
 
