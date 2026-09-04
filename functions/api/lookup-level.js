@@ -1,17 +1,19 @@
 // POST /api/lookup-level  { title, author }
 //
 // Confirms the book is real via Open Library (free, keyless, indexes new releases
-// almost immediately — fixes the AI not recognizing a book outside its training
-// data) and gets a real page count from there when available. If Open Library has
-// no match — it has real coverage gaps, especially graphic novels, newer YA, and
-// small/indie releases — falls back to scraping Goodreads (no official API, same
-// technique used for this same purpose elsewhere), which has much broader
-// coverage and, as a bonus, real genre tags that ground the classification better
-// than the Wikipedia-extract fallback. Groq then estimates the Lexile measure
-// (shown to users as "LitScore" — these are AI estimates, not officially licensed
-// Lexile scores), grade level, book type, and complexity, since no free API
-// publishes any of that. Only falls back to a pure blind AI guess if none of the
-// above find the book at all.
+// almost immediately) and gets a real page count from there when available — but
+// Open Library has no genre/audience data at all, found or not, so a genre hint
+// is always separately sought: first from scraping Goodreads (no official API,
+// same technique used for this same purpose elsewhere; real genre tags like
+// "Young Adult" or "Romance" are a much stronger classification signal than a
+// prose extract), falling back to Wikipedia's lead paragraph if Goodreads has
+// nothing. If Open Library also has no match at all — real coverage gaps exist,
+// especially graphic novels, newer YA, and small/indie releases — the Goodreads
+// result is promoted to stand in for Open Library's page count too. Groq then
+// estimates the Lexile measure (shown to users as "LitScore" — these are AI
+// estimates, not officially licensed Lexile scores), grade level, book type, and
+// complexity. Only falls back to a pure blind AI guess if none of the above find
+// the book at all.
 
 export async function onRequestPost(context) {
   const { env, request } = context;
@@ -27,30 +29,26 @@ export async function onRequestPost(context) {
   }
 
   let book = await findBook(title, author);
-  let genreHint = null;
 
-  if (!book) {
-    const gr = await findGoodreadsBook(title, author).catch(() => null);
-    if (gr) {
-      book = { title, author: author || null, year: null, pages: gr.pages };
-      if (gr.genres.length > 0) genreHint = `Genre tags: ${gr.genres.join(", ")}`;
-    }
+  // Goodreads' WAF sometimes challenges/blocks scraper traffic outright — when
+  // Open Library already confirmed the book, this is pure enrichment, so it
+  // gets exactly one quick attempt rather than the patient retry below; a miss
+  // here just falls through to Wikipedia instead of costing the whole request
+  // several extra seconds of retry/backoff.
+  const gr = await findGoodreadsBook(title, author, book ? 1 : 3).catch(() => null);
+
+  if (!book && gr) {
+    book = { title, author: author || null, year: null, pages: gr.pages };
   }
 
   if (!book) {
     return Response.json(toApiShape(await aiFullGuess(env.GROQ_API_KEY, title, author)));
   }
 
-  // Open Library only ever grounds the page count — it has no genre/audience data.
-  // Wikipedia's lead paragraph usually states the genre directly ("...is a 2024
-  // adult romance novel..."), which is exactly what was missing before this: a
-  // real book_type/complexity classification wasn't grounded by anything at all.
-  // (Skipped when Goodreads already supplied genre tags — those are a stronger,
-  // more direct signal than a prose extract, and there's no point paying for
-  // both lookups.)
-  if (!genreHint) {
-    genreHint = await findWikipediaGenreHint(book.title, book.author).catch(() => null);
-  }
+  const genreHint =
+    gr?.genres?.length > 0
+      ? `Genre tags: ${gr.genres.join(", ")}`
+      : await findWikipediaGenreHint(book.title, book.author).catch(() => null);
 
   const levelGuess = await estimateLevel(env.GROQ_API_KEY, book, genreHint).catch(() => null);
 
@@ -176,25 +174,31 @@ function parseGoodreadsBookHtml(html) {
 // first; adding the author tends to rank a thinner alternate edition (study
 // guide, box set, reprint without full metadata) above it instead. So title
 // alone is tried first, title+author only as a fallback for when that misses.
-async function grLookup(query) {
+async function grLookup(query, attempts) {
   const searchUrl = `https://www.goodreads.com/search?q=${encodeURIComponent(query)}`;
-  const searchHtml = await grGet(searchUrl);
+  const searchHtml = await grGet(searchUrl, undefined, attempts);
   if (!searchHtml) return null;
 
   const match = searchHtml.match(/href="(\/book\/show\/\d+[^"?]*)/);
   if (!match) return null;
   const bookUrl = `https://www.goodreads.com${match[1]}`;
 
-  const bookHtml = await grGet(bookUrl, searchUrl);
+  const bookHtml = await grGet(bookUrl, searchUrl, attempts);
   if (!bookHtml) return null;
 
   return parseGoodreadsBookHtml(bookHtml);
 }
 
-async function findGoodreadsBook(title, author) {
-  const result = await grLookup(title);
+// `attempts` defaults to a patient 3 retries — appropriate when Goodreads is
+// the last real chance to identify the book at all. Callers that already have
+// the book confirmed via Open Library and just want genre tags as enrichment
+// should pass a lower value (1 = no retry) so a Goodreads hiccup or block
+// can't add multiple seconds of retry/backoff to an otherwise-successful
+// lookup — Wikipedia is right there as a second-choice fallback either way.
+async function findGoodreadsBook(title, author, attempts = 3) {
+  const result = await grLookup(title, attempts);
   if (result) return result;
-  return author ? grLookup(`${title} ${author}`) : null;
+  return author ? grLookup(`${title} ${author}`, attempts) : null;
 }
 
 const WIKI_HEADERS = { "User-Agent": "Litquest/1.0 (family reading app; contact via GitHub)" };
