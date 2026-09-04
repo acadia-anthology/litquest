@@ -368,6 +368,7 @@ let renamingPlayerId = null;
 function openRenamePlayer(p) {
   renamingPlayerId = p.id;
   renamePlayerForm.name.value = p.name;
+  renamePlayerForm.avatar.value = p.avatar;
   renamePlayerModal.showModal();
 }
 
@@ -377,7 +378,7 @@ renamePlayerForm.addEventListener("submit", async (e) => {
   e.preventDefault();
   await api(`/api/players/${renamingPlayerId}`, {
     method: "PATCH",
-    body: JSON.stringify({ name: renamePlayerForm.name.value }),
+    body: JSON.stringify({ name: renamePlayerForm.name.value, avatar: renamePlayerForm.avatar.value }),
   });
   renamePlayerModal.close();
   await loadPlayers();

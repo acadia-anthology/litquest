@@ -57,8 +57,13 @@ async function findBook(title, author) {
   // A free-text query ranks far better than structured title=/author= fields —
   // those often miss the plain canonical edition entirely in favor of study
   // guides, workbooks, and adaptations that happen to match the fields exactly.
+  //
+  // Open Library's search silently returns zero results for a query containing
+  // "&" (e.g. a co-author byline like "Natalie Riess & Sara Goetter") — no error,
+  // just an empty doc list — so swap it for "and" before searching.
+  const query = author ? `${title} ${author}` : title;
   const params = new URLSearchParams({
-    q: author ? `${title} ${author}` : title,
+    q: query.replace(/&/g, " and "),
     fields: "title,author_name,first_publish_year,number_of_pages_median",
     limit: "5",
   });
