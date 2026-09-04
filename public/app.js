@@ -194,7 +194,9 @@ function formatDate(dateStr) {
 function bookRow(book, actionBtn) {
   const div = document.createElement("div");
   div.className = "book-row";
-  const meta = [book.author, book.level].filter(Boolean).join(" · ");
+  const metaParts = [book.author, book.level];
+  if (book.status === "completed" && book.pages) metaParts.push(`${book.pages} pages`);
+  const meta = metaParts.filter(Boolean).join(" · ");
   const dateLabel = book.finished_at
     ? `Started ${formatDate(book.added_at)} · Finished ${formatDate(book.finished_at)}`
     : `Started ${formatDate(book.added_at)}`;

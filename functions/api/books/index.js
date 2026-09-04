@@ -48,8 +48,8 @@ export async function onRequestPost(context) {
   const finishedAt = alreadyFinished ? body.finished_at : null;
 
   const book = await env.DB.prepare(
-    `INSERT INTO books (player_id, title, author, level, lexile, word_count, status, added_at, finished_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`
+    `INSERT INTO books (player_id, title, author, level, lexile, pages, word_count, status, added_at, finished_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`
   )
     .bind(
       body.player_id,
@@ -57,6 +57,7 @@ export async function onRequestPost(context) {
       body.author?.trim() || null,
       body.level?.trim() || null,
       lexile,
+      pages > 0 ? pages : null,
       word_count,
       status,
       addedAt,
