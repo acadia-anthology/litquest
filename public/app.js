@@ -363,7 +363,12 @@ async function tryAutoLookupLevel() {
 
     if (result.known) {
       lastLookupResult = result;
-      lookupStatus.textContent = `📖 ${result.grade_level} · Lexile ${result.lexile} · ~${result.pages} pages`;
+      const parts = [];
+      if (result.grade_level) parts.push(result.grade_level);
+      if (result.lexile) parts.push(`Lexile ${result.lexile}`);
+      if (result.pages) parts.push(`~${result.pages} pages`);
+      lookupStatus.textContent =
+        parts.length > 0 ? `📖 Found it: ${parts.join(" · ")}` : "Found the book, but couldn't estimate its details.";
     } else {
       lastLookupResult = null;
       lookupStatus.textContent = "Couldn't identify this book — it'll use default scoring (short book, no level bonus).";
@@ -383,13 +388,17 @@ titleInput.addEventListener("blur", () => {
 addBookForm.addEventListener("submit", async (e) => {
   e.preventDefault();
   const form = e.target;
+  const levelParts = [];
+  if (lastLookupResult?.grade_level) levelParts.push(lastLookupResult.grade_level);
+  if (lastLookupResult?.lexile) levelParts.push(`Lexile ${lastLookupResult.lexile}`);
+
   const payload = {
     player_id: activePlayerId,
     title: form.title.value,
     author: form.author.value,
     pages: lastLookupResult?.pages ?? "",
-    level: lastLookupResult ? `${lastLookupResult.grade_level} · Lexile ${lastLookupResult.lexile}` : "",
-    lexile: lastLookupResult ? parseInt(lastLookupResult.lexile, 10) : "",
+    level: levelParts.join(" · "),
+    lexile: lastLookupResult?.lexile ? parseInt(lastLookupResult.lexile, 10) : "",
     added_at: startedInput.value,
     finished_at: alreadyFinishedCheckbox.checked ? finishedInput.value : null,
   };
