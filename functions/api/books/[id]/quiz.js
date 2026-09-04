@@ -1,6 +1,8 @@
 // GET  /api/books/:id/quiz  -> return the latest quiz (no answers), 404 if none generated yet
 // POST /api/books/:id/quiz  -> generate a FRESH quiz via Groq (first attempt or a retake) and return it
 
+import { findGoodreadsBook } from "../../../_lib/goodreads.js";
+
 export async function onRequestGet(context) {
   const { env, params } = context;
   const quiz = await getLatestQuiz(env, params.id);
@@ -80,7 +82,13 @@ const NO_TRIVIA_RULE =
 async function generateQuiz(apiKey, book) {
   // Blind AI recall confuses books that share a universe/author (e.g. it wrote
   // Hunger Games questions for "Sunrise on the Reaping"). Ground it with a real
-  // plot summary when Wikipedia has one, instead of trusting memory alone.
+  // plot summary instead of trusting memory alone — tries Wikipedia's dedicated
+  // Plot/Synopsis section first (best case, but most books don't have one at
+  // all), then Goodreads' publisher description (exists for nearly every book,
+  // and — critically — is guaranteed to actually be about this book: Wikipedia's
+  // search sometimes surfaces the *author's* biography page instead of the book
+  // when no dedicated article exists, which silently grounded questions in the
+  // wrong content entirely before this).
   const grounding = await findPlotSummary(book.title, book.author).catch(() => null);
 
   let prompt;
@@ -94,6 +102,20 @@ ${grounding.text}
 Using ONLY the events, characters, and details in that summary — not anything else you may know about this author or series — create 5 multiple-choice reading comprehension questions for a child who just finished reading this book${
       book.level ? ` (reading level: ${book.level})` : ""
     }. Test understanding of what actually happened in the story, not obscure trivia. Keep the language simple and age-appropriate. ${NO_TRIVIA_RULE}
+
+${QUESTION_JSON_SHAPE}`;
+  } else if (grounding?.confidence === "goodreads") {
+    prompt = `Here is the real publisher's description of the book "${book.title}"${book.author ? ` by ${book.author}` : ""}:
+
+"""
+${grounding.text}
+"""
+
+This is confirmed to be about this exact book, but it's a back-cover-style blurb, not a full plot summary — it introduces the setup and characters while deliberately avoiding ending spoilers. Only ask about story elements clearly stated in this text (setting, characters, the initial premise/conflict) — do NOT invent or guess at later plot twists, the ending, or events not mentioned here.
+
+Create 5 multiple-choice reading comprehension questions for a child who just finished reading this book${
+      book.level ? ` (reading level: ${book.level})` : ""
+    }. Keep the language simple and age-appropriate. ${NO_TRIVIA_RULE}
 
 ${QUESTION_JSON_SHAPE}`;
   } else if (grounding) {
@@ -165,13 +187,26 @@ function extractSection(fullText, headingName, maxLen) {
   return fullText.slice(start, Math.min(end, start + maxLen)).trim() || null;
 }
 
-// Finds the book's real Wikipedia article and pulls out story content to ground
-// quiz questions in, instead of the model's possibly-wrong recall. A dedicated
-// "Plot"/"Synopsis" section is high confidence (book-specific). Many series only
-// have one combined article with no such section — "Premise" (+ "Characters")
-// still beats the lead paragraph, which is mostly sales/marketing facts, but is
-// lower confidence since it may span the whole series rather than this one book.
+// Tries, in order: a dedicated Wikipedia "Plot"/"Synopsis" section (best case,
+// but most books — especially anything without its own Wikipedia article at
+// all — don't have one); Goodreads' publisher description (exists for nearly
+// every book, and is guaranteed to actually be about this book); then finally
+// Wikipedia's weaker Premise/Characters/lead-paragraph fallback. That fallback
+// is deliberately tried last and only as a last resort — Wikipedia's search can
+// surface an unrelated page (most commonly the *author's own biography article*
+// when the book has no dedicated page of its own), and low-confidence text from
+// the wrong subject entirely is worse than no grounding at all.
 async function findPlotSummary(title, author) {
+  const wiki = await findWikipediaPlotSummary(title, author).catch(() => null);
+  if (wiki?.confidence === "high") return wiki;
+
+  const gr = await findGoodreadsBook(title, author, 2).catch(() => null);
+  if (gr?.description) return { text: gr.description, confidence: "goodreads" };
+
+  return wiki;
+}
+
+async function findWikipediaPlotSummary(title, author) {
   const searchQuery = author ? `${title} novel ${author}` : `${title} novel`;
   const searchRes = await fetch(
     `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(
