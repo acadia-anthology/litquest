@@ -65,14 +65,7 @@ function toClientQuiz(quiz) {
   return { quiz_id: quiz.id, questions };
 }
 
-async function generateQuiz(apiKey, book) {
-  const prompt = `Create 5 multiple-choice reading comprehension questions for a child who just finished reading the book "${book.title}"${
-    book.author ? ` by ${book.author}` : ""
-  }${book.level ? ` (reading level: ${book.level})` : ""}.
-
-Base the questions on the well-known plot, characters, and themes of this book. Test understanding of what happened in the story, not obscure trivia. Keep the language simple and age-appropriate for the reading level given.
-
-Respond with ONLY valid JSON, no markdown fences, no other text, in exactly this shape:
+const QUESTION_JSON_SHAPE = `Respond with ONLY valid JSON, no markdown fences, no other text, in exactly this shape:
 [
   {"question": "...", "choices": ["...", "...", "...", "..."], "correct_index": 0},
   {"question": "...", "choices": ["...", "...", "...", "..."], "correct_index": 0},
@@ -80,6 +73,52 @@ Respond with ONLY valid JSON, no markdown fences, no other text, in exactly this
   {"question": "...", "choices": ["...", "...", "...", "..."], "correct_index": 0},
   {"question": "...", "choices": ["...", "...", "...", "..."], "correct_index": 0}
 ]`;
+
+const NO_TRIVIA_RULE =
+  "Never ask about sales figures, awards, publication dates, adaptations, or other marketing/franchise trivia — only about the story itself: setting, characters, plot events, and themes.";
+
+async function generateQuiz(apiKey, book) {
+  // Blind AI recall confuses books that share a universe/author (e.g. it wrote
+  // Hunger Games questions for "Sunrise on the Reaping"). Ground it with a real
+  // plot summary when Wikipedia has one, instead of trusting memory alone.
+  const grounding = await findPlotSummary(book.title, book.author).catch(() => null);
+
+  let prompt;
+  if (grounding?.confidence === "high") {
+    prompt = `Here is a real, accurate plot summary of the book "${book.title}"${book.author ? ` by ${book.author}` : ""}:
+
+"""
+${grounding.text}
+"""
+
+Using ONLY the events, characters, and details in that summary — not anything else you may know about this author or series — create 5 multiple-choice reading comprehension questions for a child who just finished reading this book${
+      book.level ? ` (reading level: ${book.level})` : ""
+    }. Test understanding of what actually happened in the story, not obscure trivia. Keep the language simple and age-appropriate. ${NO_TRIVIA_RULE}
+
+${QUESTION_JSON_SHAPE}`;
+  } else if (grounding) {
+    prompt = `Here is background information about the book "${book.title}"${book.author ? ` by ${book.author}` : ""}:
+
+"""
+${grounding.text}
+"""
+
+This may describe the wider series or franchise rather than this specific book, and may mention multiple books/volumes. The child specifically read "${book.title}". If the text clearly labels which events belong to that exact book, use ONLY those parts. Otherwise, ONLY ask about story elements shared across the whole series that this book would definitely include — setting, main characters, core premise — and do NOT ask about specific plot twists or events unless you're confident they belong to this exact book, not a different volume.
+
+Create 5 multiple-choice reading comprehension questions for a child who just finished reading this book${
+      book.level ? ` (reading level: ${book.level})` : ""
+    }. Keep the language simple and age-appropriate. ${NO_TRIVIA_RULE}
+
+${QUESTION_JSON_SHAPE}`;
+  } else {
+    prompt = `Create 5 multiple-choice reading comprehension questions for a child who just finished reading the book "${book.title}"${
+      book.author ? ` by ${book.author}` : ""
+    }${book.level ? ` (reading level: ${book.level})` : ""}.
+
+Base the questions on the well-known plot, characters, and themes of this book. Test understanding of what happened in the story, not obscure trivia. Keep the language simple and age-appropriate for the reading level given. ${NO_TRIVIA_RULE}
+
+${QUESTION_JSON_SHAPE}`;
+  }
 
   const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
@@ -112,6 +151,64 @@ Respond with ONLY valid JSON, no markdown fences, no other text, in exactly this
   // The model tends to always place the correct choice first — shuffle so the
   // answer position isn't guessable.
   return questions.map(shuffleChoices);
+}
+
+const WIKI_HEADERS = { "User-Agent": "Litquest/1.0 (family reading app; contact via GitHub)" };
+
+function extractSection(fullText, headingName, maxLen) {
+  const marker = `\n${headingName}\n`;
+  const idx = fullText.indexOf(marker);
+  if (idx === -1) return null;
+  const start = idx + marker.length;
+  const nextHeading = fullText.slice(start).match(/\n[A-Z][A-Za-z ]{2,40}\n/);
+  const end = nextHeading ? start + nextHeading.index : start + maxLen;
+  return fullText.slice(start, Math.min(end, start + maxLen)).trim() || null;
+}
+
+// Finds the book's real Wikipedia article and pulls out story content to ground
+// quiz questions in, instead of the model's possibly-wrong recall. A dedicated
+// "Plot"/"Synopsis" section is high confidence (book-specific). Many series only
+// have one combined article with no such section — "Premise" (+ "Characters")
+// still beats the lead paragraph, which is mostly sales/marketing facts, but is
+// lower confidence since it may span the whole series rather than this one book.
+async function findPlotSummary(title, author) {
+  const searchQuery = author ? `${title} novel ${author}` : `${title} novel`;
+  const searchRes = await fetch(
+    `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(
+      searchQuery
+    )}&format=json&srlimit=1`,
+    { headers: WIKI_HEADERS }
+  );
+  if (!searchRes.ok) return null;
+  const searchData = await searchRes.json();
+  const pageTitle = searchData?.query?.search?.[0]?.title;
+  if (!pageTitle) return null;
+
+  const extractRes = await fetch(
+    `https://en.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(
+      pageTitle
+    )}&prop=extracts&explaintext=1&exsectionformat=plain&redirects=1&format=json`,
+    { headers: WIKI_HEADERS }
+  );
+  if (!extractRes.ok) return null;
+  const extractData = await extractRes.json();
+  const page = Object.values(extractData?.query?.pages ?? {})[0];
+  const fullText = page?.extract;
+  if (!fullText) return null;
+
+  const plot =
+    extractSection(fullText, "Plot", 3000) ||
+    extractSection(fullText, "Plot summary", 3000) ||
+    extractSection(fullText, "Synopsis", 3000);
+  if (plot) return { text: plot, confidence: "high" };
+
+  const premise = extractSection(fullText, "Premise", 2200);
+  const characters = extractSection(fullText, "Characters", 1800);
+  const combined = [premise, characters].filter(Boolean).join("\n\n");
+  if (combined) return { text: combined, confidence: "low" };
+
+  const lead = fullText.slice(0, 1200).trim();
+  return lead ? { text: lead, confidence: "low" } : null;
 }
 
 function shuffleChoices(q) {
