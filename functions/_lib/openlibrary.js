@@ -56,11 +56,12 @@ export async function findOpenLibraryBook(title, author) {
   };
 }
 
-// A short, genre-flavored subset of a book's subject tags, suitable as a
-// classification hint — drops "series:x"-style tags (not genre info) and caps
-// the count so the prompt stays short.
+// A genre-flavored subset of a book's subject tags, suitable as a
+// classification hint — drops "series:x"-style tags (not genre info). No count
+// cap: a real tag like "Adult" is exactly the kind of thing that must never get
+// silently dropped, and these lists are short enough that trimming buys nothing.
 export function subjectHint(subjects) {
-  const filtered = (subjects || []).filter((s) => !/^series:/i.test(s)).slice(0, 8);
+  const filtered = (subjects || []).filter((s) => !/^series:/i.test(s));
   return filtered.length > 0 ? `Genre/subject tags: ${filtered.join(", ")}` : null;
 }
 
