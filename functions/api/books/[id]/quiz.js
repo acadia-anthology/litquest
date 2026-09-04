@@ -1,6 +1,7 @@
 // GET  /api/books/:id/quiz  -> return the latest quiz (no answers), 404 if none generated yet
 // POST /api/books/:id/quiz  -> generate a FRESH quiz via Groq (first attempt or a retake) and return it
 
+import { findOpenLibraryBook, findOpenLibraryDescription } from "../../../_lib/openlibrary.js";
 import { findGoogleBook } from "../../../_lib/googlebooks.js";
 import { findGoodreadsBook } from "../../../_lib/goodreads.js";
 
@@ -190,17 +191,25 @@ function extractSection(fullText, headingName, maxLen) {
 
 // Tries, in order: a dedicated Wikipedia "Plot"/"Synopsis" section (best case,
 // but most books — especially anything without its own Wikipedia article at
-// all — don't have one); the publisher description from Google Books' official
-// API or (if that has nothing) scraped from Goodreads — either way, real
-// book-specific back-cover copy that exists for nearly every book; then finally
-// Wikipedia's weaker Premise/Characters/lead-paragraph fallback. That fallback
-// is deliberately tried last and only as a last resort — Wikipedia's search can
-// surface an unrelated page (most commonly the *author's own biography article*
-// when the book has no dedicated page of its own), and low-confidence text from
-// the wrong subject entirely is worse than no grounding at all.
+// all — don't have one); Open Library's per-work description (free, keyless,
+// not blocked from Cloudflare — often has the same real publisher blurb as
+// Goodreads); Google Books' official API (only active once a key is set) or
+// (if that has nothing) scraped from Goodreads — either way, real book-specific
+// back-cover copy; then finally Wikipedia's weaker Premise/Characters/
+// lead-paragraph fallback. That fallback is deliberately tried last and only as
+// a last resort — Wikipedia's search can surface an unrelated page (most
+// commonly the *author's own biography article* when the book has no dedicated
+// page of its own), and low-confidence text from the wrong subject entirely is
+// worse than no grounding at all.
 async function findPlotSummary(title, author, googleBooksKey) {
   const wiki = await findWikipediaPlotSummary(title, author).catch(() => null);
   if (wiki?.confidence === "high") return wiki;
+
+  const ol = await findOpenLibraryBook(title, author).catch(() => null);
+  if (ol?.workKey) {
+    const olDescription = await findOpenLibraryDescription(ol.workKey).catch(() => null);
+    if (olDescription) return { text: olDescription, confidence: "publisher" };
+  }
 
   const gb = await findGoogleBook(title, author, googleBooksKey).catch(() => null);
   if (gb?.description) return { text: gb.description, confidence: "publisher" };

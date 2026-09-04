@@ -1,23 +1,20 @@
 // POST /api/lookup-level  { title, author }
 //
 // Confirms the book is real via Open Library (free, keyless, indexes new releases
-// almost immediately) and gets a real page count from there when available — but
-// Open Library has no genre/audience data at all, found or not, so a genre hint
-// is always separately sought: first from the official Google Books API (real
-// BISAC category tags like "Young Adult Fiction" or "Fiction / Romance" — a much
-// stronger classification signal than a prose extract, and a real REST API, not
-// a scrape), falling back to scraping Goodreads if Google Books has nothing, and
-// Wikipedia's lead paragraph as the last resort. (Goodreads' anti-bot WAF blocks
-// Cloudflare's own network outright in practice — confirmed live, not assumed —
-// so it's kept only as a fallback behind Google Books, not relied on primarily.)
-// If Open Library also has no match at all — real coverage gaps exist,
-// especially graphic novels, newer YA, and small/indie releases — whichever
-// other source found the book is promoted to stand in for Open Library's page
-// count too. Groq then estimates the Lexile measure (shown to users as
-// "LitScore" — these are AI estimates, not officially licensed Lexile scores),
-// grade level, book type, and complexity. Only falls back to a pure blind AI
-// guess if none of the above find the book at all.
+// almost immediately) and gets a real page count AND real genre/subject tags from
+// there in one call — Open Library's search embeds subject tags directly, no
+// separate lookup needed, and unlike Goodreads it isn't blocked from Cloudflare's
+// network. When Open Library has nothing (or no subject tags), falls back to the
+// official Google Books API (only active once a GOOGLE_BOOKS_API_KEY secret
+// exists — unauthenticated access has zero quota), then scraping Goodreads
+// (unreliable — its anti-bot WAF blocks Cloudflare outright in practice, kept
+// only as a last-ditch attempt), then Wikipedia's lead paragraph. Groq then
+// estimates the Lexile measure (shown to users as "LitScore" — these are AI
+// estimates, not officially licensed Lexile scores), grade level, book type, and
+// complexity. Only falls back to a pure blind AI guess if none of the above find
+// the book at all.
 
+import { findOpenLibraryBook, subjectHint } from "../_lib/openlibrary.js";
 import { findGoogleBook } from "../_lib/googlebooks.js";
 import { findGoodreadsBook } from "../_lib/goodreads.js";
 
@@ -34,13 +31,14 @@ export async function onRequestPost(context) {
     return Response.json({ error: "Server is missing GROQ_API_KEY" }, { status: 500 });
   }
 
-  let book = await findBook(title, author);
-  const gb = await findGoogleBook(title, author, env.GOOGLE_BOOKS_API_KEY).catch(() => null);
+  const ol = await findOpenLibraryBook(title, author).catch(() => null);
+  let book = ol && { title: ol.title, author: ol.author, year: ol.year, pages: ol.pages };
+  let genreHint = subjectHint(ol?.subjects);
 
-  let genreHint = gb?.genres?.length > 0 ? `Genre tags: ${gb.genres.join(", ")}` : null;
-
-  if (!book && gb) {
-    book = { title, author: author || null, year: null, pages: gb.pages };
+  if (!book || !genreHint) {
+    const gb = await findGoogleBook(title, author, env.GOOGLE_BOOKS_API_KEY).catch(() => null);
+    if (!book && gb) book = { title, author: author || null, year: null, pages: gb.pages };
+    if (!genreHint && gb?.genres?.length > 0) genreHint = `Genre tags: ${gb.genres.join(", ")}`;
   }
 
   if (!book || !genreHint) {
@@ -50,12 +48,8 @@ export async function onRequestPost(context) {
     // here just falls through to Wikipedia instead of costing the whole request
     // several extra seconds of retry/backoff.
     const gr = await findGoodreadsBook(title, author, book && genreHint ? 1 : 3).catch(() => null);
-    if (!book && gr) {
-      book = { title, author: author || null, year: null, pages: gr.pages };
-    }
-    if (!genreHint && gr?.genres?.length > 0) {
-      genreHint = `Genre tags: ${gr.genres.join(", ")}`;
-    }
+    if (!book && gr) book = { title, author: author || null, year: null, pages: gr.pages };
+    if (!genreHint && gr?.genres?.length > 0) genreHint = `Genre tags: ${gr.genres.join(", ")}`;
   }
 
   if (!book) {
@@ -84,56 +78,6 @@ function toApiShape(result) {
   if (!result?.known) return { known: false };
   const { lexile, ...rest } = result;
   return { ...rest, lit_score: lexile ?? null };
-}
-
-async function findBook(title, author) {
-  // A free-text query ranks far better than structured title=/author= fields —
-  // those often miss the plain canonical edition entirely in favor of study
-  // guides, workbooks, and adaptations that happen to match the fields exactly.
-  //
-  // Open Library's search silently returns zero results for a query containing
-  // "&" (e.g. a co-author byline like "Natalie Riess & Sara Goetter") — no error,
-  // just an empty doc list — so swap it for "and" before searching.
-  const query = author ? `${title} ${author}` : title;
-  const params = new URLSearchParams({
-    q: query.replace(/&/g, " and "),
-    fields: "title,author_name,first_publish_year,number_of_pages_median",
-    limit: "5",
-  });
-
-  let res;
-  try {
-    res = await fetch(`https://openlibrary.org/search.json?${params}`, {
-      headers: { "User-Agent": "Litquest/1.0 (family reading app; contact via GitHub)" },
-    });
-  } catch {
-    return null;
-  }
-  if (!res.ok) return null;
-
-  const data = await res.json().catch(() => null);
-  const docs = data?.docs || [];
-  if (docs.length === 0) return null;
-
-  // Trust Open Library's own relevance ranking for the top pick. Only look further
-  // for a page count if it's missing, and only among titles that still contain the
-  // query — an unrelated book that happens to list a page count is worse than none.
-  const norm = (s) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
-  const queryNorm = norm(title);
-  let best = docs[0];
-  if (!best.number_of_pages_median) {
-    const closeMatchWithPages = docs.find(
-      (d) => d.number_of_pages_median && norm(d.title).includes(queryNorm)
-    );
-    if (closeMatchWithPages) best = closeMatchWithPages;
-  }
-
-  return {
-    title: best.title,
-    author: best.author_name?.[0] || author || null,
-    year: best.first_publish_year || null,
-    pages: best.number_of_pages_median || null,
-  };
 }
 
 const WIKI_HEADERS = { "User-Agent": "Litquest/1.0 (family reading app; contact via GitHub)" };
