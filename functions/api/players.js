@@ -1,4 +1,4 @@
-const POINTS_PER_LEVEL = 100;
+import { withLevel } from "../_lib/level.js";
 
 // GET  /api/players  -> list every player with computed level, ranked by points (for the leaderboard)
 // POST /api/players   { name, avatar, reader_type }  -> create a new player/profile
@@ -19,23 +19,13 @@ export async function onRequestPost(context) {
   }
 
   const readerType = body.reader_type === "adult" ? "adult" : "kid";
+  const defaultAvatar = readerType === "adult" ? "🍎" : "🍏";
 
   const player = await env.DB.prepare(
     "INSERT INTO players (name, avatar, reader_type) VALUES (?, ?, ?) RETURNING *"
   )
-    .bind(body.name.trim(), body.avatar?.trim() || "🧑", readerType)
+    .bind(body.name.trim(), body.avatar?.trim() || defaultAvatar, readerType)
     .first();
 
   return Response.json(withLevel(player), { status: 201 });
-}
-
-function withLevel(player) {
-  const level = Math.floor(player.total_points / POINTS_PER_LEVEL) + 1;
-  const points_into_level = player.total_points % POINTS_PER_LEVEL;
-  return {
-    ...player,
-    level,
-    points_into_level,
-    points_to_next_level: POINTS_PER_LEVEL - points_into_level,
-  };
 }

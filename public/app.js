@@ -139,7 +139,8 @@ function renderQuestBar(track) {
   const marks = track.rewards
     .map((r) => {
       const pct = (r.threshold / scaleMax) * 100;
-      return `<span class="quest-mark${r.reached ? " reached" : ""}" style="left:${pct}%" title="${r.threshold} pts: ${escapeHtml(r.reward_text)}">${r.emoji}</span>`;
+      const tooltip = `${r.threshold} pts: ${r.emoji} ${r.reward_text}`;
+      return `<span class="quest-mark${r.reached ? " reached" : ""}" style="left:${pct}%" title="${escapeHtml(tooltip)}" data-tooltip="${escapeHtml(tooltip)}">${r.emoji}</span>`;
     })
     .join("");
 
@@ -150,11 +151,32 @@ function renderQuestBar(track) {
     </div>
   `;
 
+  barEl.querySelectorAll(".quest-mark").forEach((markEl) => {
+    markEl.addEventListener("click", (e) => {
+      e.stopPropagation();
+      toggleQuestTooltip(markEl);
+    });
+  });
+
   const next = track.rewards.find((r) => !r.reached);
   nextEl.textContent = next
     ? `${track.points}/${next.threshold} pts to ${next.emoji} ${next.reward_text}`
     : `🎉 All rewards unlocked this cycle! (${track.points} pts)`;
 }
+
+function toggleQuestTooltip(markEl) {
+  const wasOpen = markEl.querySelector(".quest-tooltip");
+  document.querySelectorAll(".quest-tooltip").forEach((t) => t.remove());
+  if (wasOpen) return;
+  const tip = document.createElement("div");
+  tip.className = "quest-tooltip";
+  tip.textContent = markEl.dataset.tooltip;
+  markEl.appendChild(tip);
+}
+
+document.addEventListener("click", () => {
+  document.querySelectorAll(".quest-tooltip").forEach((t) => t.remove());
+});
 
 async function showCelebration(claim) {
   const content = document.getElementById("celebrationContent");
@@ -185,25 +207,23 @@ async function loadGoalNotices() {
   const p = activePlayer();
   if (!p || p.reader_type !== "adult") {
     el.innerHTML = "";
+    document.getElementById("deliveredHistory").hidden = true;
     return;
   }
 
   const pending = await api("/api/quests/pending");
-  if (pending.length === 0) {
-    el.innerHTML = "";
-    return;
-  }
-
-  el.innerHTML = pending
-    .map(
-      (c) => `
+  el.innerHTML = pending.length === 0
+    ? ""
+    : pending
+        .map(
+          (c) => `
     <div class="goal-notice">
       <span>${c.player_avatar} ${escapeHtml(c.player_name)} reached a goal — ${c.emoji} ${escapeHtml(c.reward_text)}!</span>
       <button type="button" class="mark-delivered-btn" data-id="${c.id}">Mark Delivered</button>
     </div>
   `
-    )
-    .join("");
+        )
+        .join("");
 
   el.querySelectorAll(".mark-delivered-btn").forEach((btn) => {
     btn.addEventListener("click", async () => {
@@ -214,6 +234,33 @@ async function loadGoalNotices() {
       await loadGoalNotices();
     });
   });
+
+  await loadDeliveredHistory();
+}
+
+async function loadDeliveredHistory() {
+  const el = document.getElementById("deliveredHistory");
+  const history = await api("/api/quests/delivered");
+  if (history.length === 0) {
+    el.hidden = true;
+    return;
+  }
+  el.hidden = false;
+  el.innerHTML = `
+    <h3 class="delivered-history-title">📬 Reward History</h3>
+    <div class="delivered-history-list">
+      ${history
+        .map(
+          (c) => `
+        <div class="delivered-history-row">
+          <span>${c.player_avatar} ${escapeHtml(c.player_name)} got ${c.emoji} ${escapeHtml(c.reward_text)}</span>
+          <span class="delivered-history-date">${formatDate(c.delivered_at)}</span>
+        </div>
+      `
+        )
+        .join("")}
+    </div>
+  `;
 }
 
 document.getElementById("readerTypeSelect").addEventListener("change", async (e) => {
@@ -788,7 +835,7 @@ async function showPointsBreakdown(book) {
   }
 
   const pctLabel = b.pct != null ? `${Math.round(b.pct * 100)}%` : "n/a";
-  const profileLabel = b.reader_type === "adult" ? "🧑 Adult profile" : "🧒 Kid profile";
+  const profileLabel = b.reader_type === "adult" ? "🍎 Adult profile" : "🍏 Kid profile";
 
   content.innerHTML = `
     <div class="breakdown-steps">

@@ -12,16 +12,22 @@
   <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
-  <header class="topbar">
+  <header class="topbar" hidden>
     <a href="/" class="brand" style="text-decoration:none">📚 <span>Litquest</span></a>
     <div class="topbar-right">
       <a href="/" class="btn">← Back to Litquest</a>
     </div>
   </header>
 
-  <main>
+  <main hidden>
     <h1 class="rewards-title">⭐ Quest Rewards</h1>
     <p class="rewards-subtitle">Kid profiles only. Editing needs the PIN.</p>
+
+    <div class="kid-picker-row">
+      <label>Kid profile
+        <select id="kidPicker"></select>
+      </label>
+    </div>
 
     <div id="lockedNotice" class="pin-gate">
       <label>Enter PIN to edit<input type="password" id="pinInput" inputmode="numeric" maxlength="8" placeholder="••••" /></label>
@@ -35,6 +41,10 @@
       <div class="rewards-list" id="side-rewards-list"></div>
       <form class="quest-add-form" id="side-add-form" hidden>
         <input type="number" name="threshold" min="1" required placeholder="Points" />
+        <select name="unit" class="unit-select">
+          <option value="points">pts</option>
+          <option value="level">level</option>
+        </select>
         <input type="text" name="emoji" maxlength="4" required placeholder="🍦" />
         <input type="text" name="reward_text" required placeholder="Reward" />
         <button type="submit" class="btn primary">Add</button>
@@ -47,6 +57,10 @@
       <div class="rewards-list" id="main-rewards-list"></div>
       <form class="quest-add-form" id="main-add-form" hidden>
         <input type="number" name="threshold" min="1" required placeholder="Points" />
+        <select name="unit" class="unit-select">
+          <option value="points">pts</option>
+          <option value="level">level</option>
+        </select>
         <input type="text" name="emoji" maxlength="4" required placeholder="🎡" />
         <input type="text" name="reward_text" required placeholder="Reward" />
         <button type="submit" class="btn primary">Add</button>
@@ -54,6 +68,6 @@
     </section>
   </main>
 
-  <script src="/rewards.js"></script>
+  <script src="/auth-gate.js" data-next="/rewards.js"></script>
 </body>
 </html>

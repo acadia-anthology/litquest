@@ -16,10 +16,14 @@ export async function onRequestGet(context) {
     return Response.json({ error: "player_id query param is required" }, { status: 400 });
   }
 
-  const { results: quests } = await env.DB.prepare("SELECT * FROM quests").all();
+  const { results: quests } = await env.DB.prepare("SELECT * FROM quests WHERE player_id = ?")
+    .bind(playerId)
+    .all();
   const { results: rewards } = await env.DB.prepare(
-    "SELECT * FROM quest_rewards ORDER BY quest_type, threshold ASC"
-  ).all();
+    "SELECT * FROM quest_rewards WHERE player_id = ? ORDER BY quest_type, threshold ASC"
+  )
+    .bind(playerId)
+    .all();
 
   const newlyReached = [];
   const tracks = [];

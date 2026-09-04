@@ -43,22 +43,26 @@ CREATE TABLE IF NOT EXISTS quiz_attempts (
   completed_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
--- Two shared quest tracks (Side Quest = short cycle, Main Quest = long cycle).
--- Kid profiles only. Progress is points earned within the current cycle, which
--- rolls forward automatically from anchor_date every period_months.
+-- Two quest tracks per kid (Side Quest = short cycle, Main Quest = long cycle),
+-- individually configurable so each kid profile can have its own rewards.
+-- Progress is points earned within the current cycle, which rolls forward
+-- automatically from anchor_date every period_months.
 CREATE TABLE IF NOT EXISTS quests (
-  quest_type TEXT PRIMARY KEY, -- 'side' | 'main'
+  player_id INTEGER NOT NULL REFERENCES players(id),
+  quest_type TEXT NOT NULL, -- 'side' | 'main'
   period_months INTEGER NOT NULL,
-  anchor_date TEXT NOT NULL
+  anchor_date TEXT NOT NULL,
+  PRIMARY KEY (player_id, quest_type)
 );
 
 CREATE TABLE IF NOT EXISTS quest_rewards (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
+  player_id INTEGER NOT NULL REFERENCES players(id),
   quest_type TEXT NOT NULL, -- 'side' | 'main'
   threshold INTEGER NOT NULL, -- points needed within the current cycle
   emoji TEXT NOT NULL,
   reward_text TEXT NOT NULL,
-  UNIQUE(quest_type, threshold)
+  UNIQUE(player_id, quest_type, threshold)
 );
 
 -- One row per (player, quest, cycle, reward) the very first time it's crossed —
