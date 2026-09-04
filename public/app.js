@@ -286,9 +286,9 @@ function renderLeaderboard() {
 const monthSelect = document.getElementById("monthSelect");
 const MONTH_ABBR = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
 
-function monthLabel(monthStr) {
+function monthLabel(monthStr, fullYear = false) {
   const [year, month] = monthStr.split("-");
-  return `${MONTH_ABBR[Number(month) - 1]} ${year.slice(2)}`;
+  return `${MONTH_ABBR[Number(month) - 1]} ${fullYear ? year : year.slice(2)}`;
 }
 
 function currentMonthStr() {
@@ -530,9 +530,25 @@ async function loadBooks() {
     quizReadyCards.appendChild(bookRow(b, quizBtn));
   });
 
-  completed.forEach((b) => {
-    completedCards.appendChild(bookRow(b));
-  });
+  const byMonth = new Map();
+  [...completed]
+    .sort((a, b) => b.finished_at.localeCompare(a.finished_at))
+    .forEach((b) => {
+      const key = b.finished_at.slice(0, 7);
+      if (!byMonth.has(key)) byMonth.set(key, []);
+      byMonth.get(key).push(b);
+    });
+
+  [...byMonth.keys()]
+    .sort()
+    .reverse()
+    .forEach((key) => {
+      const heading = document.createElement("h3");
+      heading.className = "completed-month-heading";
+      heading.textContent = monthLabel(key, true);
+      completedCards.appendChild(heading);
+      byMonth.get(key).forEach((b) => completedCards.appendChild(bookRow(b)));
+    });
 }
 
 // --- Add book ---

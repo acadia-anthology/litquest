@@ -426,6 +426,18 @@ main {
   min-height: 40px;
 }
 
+.completed-month-heading {
+  margin: 14px 0 -2px;
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: #a79fc2;
+}
+
+.completed-month-heading:first-child {
+  margin-top: 0;
+}
+
 .book-row {
   display: flex;
   align-items: center;
