@@ -273,9 +273,8 @@ function renderLeaderboard() {
   ranked.forEach((p, i) => {
     const row = document.createElement("div");
     row.className = "leaderboard-row";
-    const medal = ["🥇", "🥈", "🥉"][i] || `#${i + 1}`;
     row.innerHTML = `
-      <span class="rank">${medal}</span>
+      <span class="rank">#${i + 1}</span>
       <span class="avatar">${p.avatar}</span>
       <span class="name">${escapeHtml(p.name)}</span>
       <span class="stats">Lv ${p.level} · ${p.total_points} pts · ${p.books_completed} books</span>
