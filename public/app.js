@@ -206,6 +206,13 @@ function formatDate(dateStr) {
   return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 }
 
+// Strips any trailing non-digit suffix (the model echoes a Lexile-style "760L")
+// and appends our own "LS" instead, e.g. 760 -> "760LS".
+function formatLitScore(raw) {
+  const num = parseInt(raw, 10);
+  return Number.isFinite(num) ? `${num}LS` : null;
+}
+
 function bookRow(book, actionBtn) {
   const div = document.createElement("div");
   div.className = "book-row";
@@ -217,7 +224,9 @@ function bookRow(book, actionBtn) {
     : `Started ${formatDate(book.added_at)}`;
 
   const pointsBadge =
-    book.points_earned > 0 ? `<span class="points-badge">+${book.points_earned} pts</span>` : "";
+    book.points_earned > 0
+      ? `<button type="button" class="points-badge" title="How were these points earned?">+${book.points_earned} pts</button>`
+      : "";
 
   const quizScoreLine =
     book.status === "completed" && Number.isFinite(book.quiz_score) && Number.isFinite(book.quiz_total)
@@ -245,6 +254,7 @@ function bookRow(book, actionBtn) {
   div.querySelector(".edit-dates-btn").addEventListener("click", () => toggleDateEditor(div, book));
   div.querySelector(".delete-book-btn").addEventListener("click", () => deleteBook(book));
   div.querySelector(".quiz-score-label")?.addEventListener("click", () => showQuizReview(book));
+  div.querySelector(".points-badge")?.addEventListener("click", () => showPointsBreakdown(book));
 
   if (actionBtn) {
     actionBtn.classList.add("action-btn");
@@ -438,7 +448,7 @@ async function tryAutoLookupLevel() {
       lastLookupResult = result;
       const parts = [];
       if (result.book_type) parts.push(result.book_type);
-      if (result.lit_score) parts.push(`LitScore ${result.lit_score}`);
+      if (result.lit_score) parts.push(`LitScore ${formatLitScore(result.lit_score)}`);
       if (result.pages) parts.push(`~${result.pages} pages`);
       lookupStatus.textContent =
         parts.length > 0 ? `📖 Found it: ${parts.join(" · ")}` : "Found the book, but couldn't estimate its details.";
@@ -463,7 +473,7 @@ addBookForm.addEventListener("submit", async (e) => {
   const form = e.target;
   const levelParts = [];
   if (lastLookupResult?.book_type) levelParts.push(lastLookupResult.book_type);
-  if (lastLookupResult?.lit_score) levelParts.push(`LitScore ${lastLookupResult.lit_score}`);
+  if (lastLookupResult?.lit_score) levelParts.push(`LitScore ${formatLitScore(lastLookupResult.lit_score)}`);
 
   const payload = {
     player_id: activePlayerId,
@@ -621,6 +631,64 @@ async function showQuizReview(book) {
       `;
     })
     .join("");
+}
+
+// --- Points breakdown ---
+
+const pointsBreakdownModal = document.getElementById("pointsBreakdownModal");
+document.getElementById("closePointsBreakdown").addEventListener("click", () => pointsBreakdownModal.close());
+
+function multiplierReason(b) {
+  if (b.reader_type === "adult") {
+    if (b.book_type === "Adult") {
+      return `Adult book, ${b.complexity || "Standard"} complexity`;
+    }
+    return `${b.book_type || "unclassified"} book — not challenging reading for an adult`;
+  }
+  return b.lit_score ? `LitScore ${formatLitScore(b.lit_score)}` : "no LitScore on file (neutral)";
+}
+
+async function showPointsBreakdown(book) {
+  document.getElementById("pointsBreakdownTitle").textContent = `Points: ${book.title}`;
+  const content = document.getElementById("pointsBreakdownContent");
+  content.innerHTML = "<p>Loading...</p>";
+  pointsBreakdownModal.showModal();
+
+  let b;
+  try {
+    b = await api(`/api/books/${book.id}/points-breakdown`);
+  } catch (err) {
+    content.innerHTML = `<p>Couldn't load the breakdown: ${escapeHtml(err.message)}</p>`;
+    return;
+  }
+
+  const pctLabel = b.pct != null ? `${Math.round(b.pct * 100)}%` : "n/a";
+  const profileLabel = b.reader_type === "adult" ? "🧑 Adult profile" : "🧒 Kid profile";
+
+  content.innerHTML = `
+    <div class="breakdown-steps">
+      <div class="breakdown-step">
+        <span class="breakdown-label">📏 Length — ${escapeHtml(b.length_tier_label)}</span>
+        <span class="breakdown-value">base points</span>
+      </div>
+      <div class="breakdown-step breakdown-sub">
+        <span class="breakdown-label">${profileLabel} · ${escapeHtml(multiplierReason(b))}</span>
+        <span class="breakdown-value">× ${b.multiplier}</span>
+      </div>
+      <div class="breakdown-step breakdown-total">
+        <span class="breakdown-label">= points possible</span>
+        <span class="breakdown-value">${b.base_points}</span>
+      </div>
+      <div class="breakdown-step breakdown-sub">
+        <span class="breakdown-label">📝 Quiz score ${b.quiz_score ?? "?"}/${b.quiz_total ?? "?"} (${pctLabel})</span>
+        <span class="breakdown-value">× ${pctLabel}</span>
+      </div>
+      <div class="breakdown-step breakdown-total breakdown-final">
+        <span class="breakdown-label">= points earned</span>
+        <span class="breakdown-value">${b.points_earned}</span>
+      </div>
+    </div>
+  `;
 }
 
 // --- init ---

@@ -483,6 +483,13 @@ main {
   padding: 5px 12px;
   border-radius: 999px;
   white-space: nowrap;
+  border: none;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.points-badge:hover {
+  background: var(--purple);
 }
 
 .empty-hint {
@@ -682,4 +689,37 @@ dialog::backdrop {
   background: #ffe9f0;
   color: var(--pink);
   font-weight: 700;
+}
+
+.breakdown-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.breakdown-step {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px;
+  font-size: 0.9rem;
+}
+
+.breakdown-sub {
+  color: #8a8399;
+  font-size: 0.85rem;
+  padding-left: 20px;
+}
+
+.breakdown-total {
+  border-top: 2px solid #ece9ff;
+  font-weight: 700;
+  color: var(--purple);
+}
+
+.breakdown-final {
+  border-top: 2px solid var(--pink);
+  color: var(--pink);
+  font-size: 1.05rem;
 }
