@@ -111,6 +111,15 @@ h1, h2, .brand, .btn {
   color: #8a8399;
 }
 
+.rename-player-btn {
+  font-size: 0.8rem;
+  opacity: 0.5;
+}
+
+.rename-player-btn:hover {
+  opacity: 1;
+}
+
 .profile-bar {
   display: flex;
   align-items: center;

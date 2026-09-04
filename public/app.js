@@ -73,8 +73,12 @@ function renderPlayerSwitcher() {
   players.forEach((p) => {
     const btn = document.createElement("button");
     btn.className = `player-pill${p.id === activePlayerId ? " active" : ""}`;
-    btn.textContent = `${p.avatar} ${p.name}`;
+    btn.innerHTML = `${p.avatar} ${escapeHtml(p.name)} <span class="rename-player-btn" title="Rename">✏️</span>`;
     btn.addEventListener("click", () => setActivePlayer(p.id));
+    btn.querySelector(".rename-player-btn").addEventListener("click", (e) => {
+      e.stopPropagation();
+      openRenamePlayer(p);
+    });
     el.appendChild(btn);
   });
   const addBtn = document.createElement("button");
@@ -353,6 +357,30 @@ document.getElementById("addPlayerForm").addEventListener("submit", async (e) =>
   addPlayerModal.close();
   await loadPlayers();
   setActivePlayer(newPlayer.id);
+});
+
+// --- Rename player ---
+
+const renamePlayerModal = document.getElementById("renamePlayerModal");
+const renamePlayerForm = document.getElementById("renamePlayerForm");
+let renamingPlayerId = null;
+
+function openRenamePlayer(p) {
+  renamingPlayerId = p.id;
+  renamePlayerForm.name.value = p.name;
+  renamePlayerModal.showModal();
+}
+
+document.getElementById("cancelRenamePlayer").addEventListener("click", () => renamePlayerModal.close());
+
+renamePlayerForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  await api(`/api/players/${renamingPlayerId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ name: renamePlayerForm.name.value }),
+  });
+  renamePlayerModal.close();
+  await loadPlayers();
 });
 
 // --- Books board ---
