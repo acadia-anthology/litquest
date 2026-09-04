@@ -2,11 +2,16 @@
 //
 // Confirms the book is real via Open Library (free, keyless, indexes new releases
 // almost immediately — fixes the AI not recognizing a book outside its training
-// data) and gets a real page count from there when available. Groq then estimates
-// the Lexile measure (shown to users as "LitScore" — these are AI estimates, not
-// officially licensed Lexile scores), grade level, book type, and complexity,
-// since no free API publishes any of that. Falls back to a pure AI guess if Open
-// Library has no match at all.
+// data) and gets a real page count from there when available. If Open Library has
+// no match — it has real coverage gaps, especially graphic novels, newer YA, and
+// small/indie releases — falls back to scraping Goodreads (no official API, same
+// technique used for this same purpose elsewhere), which has much broader
+// coverage and, as a bonus, real genre tags that ground the classification better
+// than the Wikipedia-extract fallback. Groq then estimates the Lexile measure
+// (shown to users as "LitScore" — these are AI estimates, not officially licensed
+// Lexile scores), grade level, book type, and complexity, since no free API
+// publishes any of that. Only falls back to a pure blind AI guess if none of the
+// above find the book at all.
 
 export async function onRequestPost(context) {
   const { env, request } = context;
@@ -21,7 +26,16 @@ export async function onRequestPost(context) {
     return Response.json({ error: "Server is missing GROQ_API_KEY" }, { status: 500 });
   }
 
-  const book = await findBook(title, author);
+  let book = await findBook(title, author);
+  let genreHint = null;
+
+  if (!book) {
+    const gr = await findGoodreadsBook(title, author).catch(() => null);
+    if (gr) {
+      book = { title, author: author || null, year: null, pages: gr.pages };
+      if (gr.genres.length > 0) genreHint = `Genre tags: ${gr.genres.join(", ")}`;
+    }
+  }
 
   if (!book) {
     return Response.json(toApiShape(await aiFullGuess(env.GROQ_API_KEY, title, author)));
@@ -31,7 +45,12 @@ export async function onRequestPost(context) {
   // Wikipedia's lead paragraph usually states the genre directly ("...is a 2024
   // adult romance novel..."), which is exactly what was missing before this: a
   // real book_type/complexity classification wasn't grounded by anything at all.
-  const genreHint = await findWikipediaGenreHint(book.title, book.author).catch(() => null);
+  // (Skipped when Goodreads already supplied genre tags — those are a stronger,
+  // more direct signal than a prose extract, and there's no point paying for
+  // both lookups.)
+  if (!genreHint) {
+    genreHint = await findWikipediaGenreHint(book.title, book.author).catch(() => null);
+  }
 
   const levelGuess = await estimateLevel(env.GROQ_API_KEY, book, genreHint).catch(() => null);
 
@@ -101,6 +120,81 @@ async function findBook(title, author) {
     year: best.first_publish_year || null,
     pages: best.number_of_pages_median || null,
   };
+}
+
+// Goodreads has no official API, so this scrapes it — same technique as the
+// author's own Discord bot uses for the same purpose. Every step fails soft
+// (returns null) so a scrape hiccup or a page-structure change just falls
+// through to the next source instead of erroring the whole lookup.
+const GOODREADS_HEADERS = {
+  "User-Agent":
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36",
+  "Accept-Language": "en-US,en;q=0.9",
+};
+
+// Goodreads intermittently 503s/blocks datacenter IPs and clears up within a
+// couple seconds — worth a couple of retries. A 404 is a real "doesn't exist"
+// though, not worth retrying.
+async function grGet(url, referer, attempts = 3) {
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    try {
+      const headers = referer ? { ...GOODREADS_HEADERS, Referer: referer } : GOODREADS_HEADERS;
+      const res = await fetch(url, { headers });
+      if (res.status === 200) return await res.text();
+      if (res.status === 404) return null;
+    } catch {
+      // fall through to retry
+    }
+    if (attempt < attempts - 1) {
+      await new Promise((resolve) => setTimeout(resolve, 1500 * (attempt + 1)));
+    }
+  }
+  return null;
+}
+
+// Pulls page count and genre tags out of a Goodreads book page's __NEXT_DATA__
+// blob (the JSON its React frontend embeds in every page).
+function parseGoodreadsBookHtml(html) {
+  const match = html.match(/<script id="__NEXT_DATA__" type="application\/json">(.*?)<\/script>/s);
+  if (!match) return null;
+  try {
+    const data = JSON.parse(match[1]);
+    const apollo = data.props.pageProps.apolloState;
+    const rootKey = Object.keys(apollo.ROOT_QUERY).find((k) => k.startsWith("getBookByLegacyId"));
+    if (!rootKey) return null;
+    const book = apollo[apollo.ROOT_QUERY[rootKey].__ref];
+    if (!book?.webUrl) return null;
+
+    const genres = (book.bookGenres || []).map((g) => g.genre?.name).filter(Boolean);
+    return { pages: book.details?.numPages || null, genres };
+  } catch {
+    return null;
+  }
+}
+
+// Title-only search reliably surfaces the canonical/most-reviewed edition
+// first; adding the author tends to rank a thinner alternate edition (study
+// guide, box set, reprint without full metadata) above it instead. So title
+// alone is tried first, title+author only as a fallback for when that misses.
+async function grLookup(query) {
+  const searchUrl = `https://www.goodreads.com/search?q=${encodeURIComponent(query)}`;
+  const searchHtml = await grGet(searchUrl);
+  if (!searchHtml) return null;
+
+  const match = searchHtml.match(/href="(\/book\/show\/\d+[^"?]*)/);
+  if (!match) return null;
+  const bookUrl = `https://www.goodreads.com${match[1]}`;
+
+  const bookHtml = await grGet(bookUrl, searchUrl);
+  if (!bookHtml) return null;
+
+  return parseGoodreadsBookHtml(bookHtml);
+}
+
+async function findGoodreadsBook(title, author) {
+  const result = await grLookup(title);
+  if (result) return result;
+  return author ? grLookup(`${title} ${author}`) : null;
 }
 
 const WIKI_HEADERS = { "User-Agent": "Litquest/1.0 (family reading app; contact via GitHub)" };
