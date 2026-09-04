@@ -88,7 +88,18 @@ function renderProfileBar() {
   document.getElementById("levelBadge").textContent = `${p.avatar} Lv ${p.level}`;
   document.getElementById("pointsText").textContent = `${p.total_points} pts`;
   document.getElementById("xpFill").style.width = `${p.points_into_level}%`;
+  document.getElementById("readerTypeSelect").value = p.reader_type;
 }
+
+document.getElementById("readerTypeSelect").addEventListener("change", async (e) => {
+  const p = activePlayer();
+  if (!p) return;
+  await api(`/api/players/${p.id}`, {
+    method: "PATCH",
+    body: JSON.stringify({ reader_type: e.target.value }),
+  });
+  await loadPlayers();
+});
 
 function renderLeaderboard() {
   const el = document.getElementById("leaderboardList");
@@ -175,7 +186,11 @@ document.getElementById("addPlayerForm").addEventListener("submit", async (e) =>
   const form = e.target;
   const newPlayer = await api("/api/players", {
     method: "POST",
-    body: JSON.stringify({ name: form.name.value, avatar: form.avatar.value }),
+    body: JSON.stringify({
+      name: form.name.value,
+      avatar: form.avatar.value,
+      reader_type: form.reader_type.value,
+    }),
   });
   form.reset();
   addPlayerModal.close();
@@ -204,6 +219,11 @@ function bookRow(book, actionBtn) {
   const pointsBadge =
     book.points_earned > 0 ? `<span class="points-badge">+${book.points_earned} pts</span>` : "";
 
+  const quizScoreLine =
+    book.status === "completed" && Number.isFinite(book.quiz_score) && Number.isFinite(book.quiz_total)
+      ? `<span class="quiz-score-label">Quiz: ${book.quiz_score}/${book.quiz_total}</span>`
+      : "";
+
   div.innerHTML = `
     <div class="row-main">
       ${pointsBadge}
@@ -215,9 +235,10 @@ function bookRow(book, actionBtn) {
     <div class="row-side">
       <div class="dates">
         <span class="date-label">${dateLabel}</span>
-        <button type="button" class="edit-dates-btn" title="Edit dates">✏️</button>
-        <button type="button" class="delete-book-btn" title="Delete this book">🗑️</button>
+        ${quizScoreLine}
       </div>
+      <button type="button" class="edit-dates-btn" title="Edit dates">✏️</button>
+      <button type="button" class="delete-book-btn" title="Delete this book">🗑️</button>
     </div>
   `;
 
@@ -339,6 +360,7 @@ function resetAddBookForm() {
   finishedDateRow.hidden = true;
   alreadyFinishedHint.hidden = true;
   addBookSubmitBtn.textContent = "Start Reading";
+  addBookSubmitBtn.disabled = false;
   lookupStatus.hidden = true;
   lookupToken++;
   lastLookupResult = null;
@@ -361,7 +383,7 @@ document.getElementById("cancelAddBook").addEventListener("click", () => {
 });
 
 let lookupToken = 0;
-let lastLookupResult = null; // { grade_level, lexile, pages } — drives scoring, not user-editable
+let lastLookupResult = null; // { grade_level, grade_level_num, lit_score, book_type, complexity, pages } — drives scoring, not user-editable
 
 // Any edit after a lookup invalidates it, so a stale result for a since-changed
 // title/author never gets submitted.
@@ -370,6 +392,7 @@ function invalidateLookup() {
     lastLookupResult = null;
     lookupStatus.hidden = true;
   }
+  addBookSubmitBtn.disabled = false;
 }
 titleInput.addEventListener("input", invalidateLookup);
 authorInput.addEventListener("input", invalidateLookup);
@@ -381,6 +404,7 @@ async function tryAutoLookupLevel() {
   const myToken = ++lookupToken;
   lookupStatus.hidden = false;
   lookupStatus.textContent = "🔍 Looking up this book...";
+  addBookSubmitBtn.disabled = false;
 
   try {
     const result = await api("/api/lookup-level", {
@@ -389,11 +413,16 @@ async function tryAutoLookupLevel() {
     });
     if (myToken !== lookupToken) return; // a newer lookup superseded this one
 
-    if (result.known) {
+    if (result.known && Number.isFinite(result.grade_level_num) && result.grade_level_num < 4) {
+      lastLookupResult = null;
+      addBookSubmitBtn.disabled = true;
+      lookupStatus.textContent = `🚫 This looks like a ${result.grade_level || "K-3"} book — Litquest only logs 4th grade and up.`;
+    } else if (result.known) {
       lastLookupResult = result;
       const parts = [];
       if (result.grade_level) parts.push(result.grade_level);
-      if (result.lexile) parts.push(`Lexile ${result.lexile}`);
+      if (result.lit_score) parts.push(`LitScore ${result.lit_score}`);
+      if (result.book_type) parts.push(result.book_type);
       if (result.pages) parts.push(`~${result.pages} pages`);
       lookupStatus.textContent =
         parts.length > 0 ? `📖 Found it: ${parts.join(" · ")}` : "Found the book, but couldn't estimate its details.";
@@ -418,7 +447,7 @@ addBookForm.addEventListener("submit", async (e) => {
   const form = e.target;
   const levelParts = [];
   if (lastLookupResult?.grade_level) levelParts.push(lastLookupResult.grade_level);
-  if (lastLookupResult?.lexile) levelParts.push(`Lexile ${lastLookupResult.lexile}`);
+  if (lastLookupResult?.lit_score) levelParts.push(`LitScore ${lastLookupResult.lit_score}`);
 
   const payload = {
     player_id: activePlayerId,
@@ -426,7 +455,10 @@ addBookForm.addEventListener("submit", async (e) => {
     author: form.author.value,
     pages: lastLookupResult?.pages ?? "",
     level: levelParts.join(" · "),
-    lexile: lastLookupResult?.lexile ? parseInt(lastLookupResult.lexile, 10) : "",
+    lit_score: lastLookupResult?.lit_score ? parseInt(lastLookupResult.lit_score, 10) : "",
+    book_type: lastLookupResult?.book_type ?? "",
+    complexity: lastLookupResult?.complexity ?? "",
+    grade_level_num: lastLookupResult?.grade_level_num ?? "",
     added_at: startedInput.value,
     finished_at: alreadyFinishedCheckbox.checked ? finishedInput.value : null,
   };

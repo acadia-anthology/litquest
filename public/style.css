@@ -118,6 +118,19 @@ h1, h2, .brand, .btn {
   margin-bottom: 20px;
 }
 
+#readerTypeSelect {
+  margin-left: auto;
+  font-family: 'Nunito', sans-serif;
+  font-weight: 700;
+  font-size: 0.85rem;
+  padding: 6px 10px;
+  border-radius: 10px;
+  border: 2px solid #e6e1ff;
+  background: white;
+  color: var(--purple);
+  cursor: pointer;
+}
+
 .level-badge {
   background: var(--purple);
   color: white;
@@ -435,9 +448,15 @@ main {
   font-size: 0.8rem;
   color: #a79fc2;
   display: flex;
-  align-items: center;
-  gap: 6px;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
   white-space: nowrap;
+}
+
+.book-row .quiz-score-label {
+  font-weight: 700;
+  color: var(--purple);
 }
 
 .book-row .action-btn {
@@ -564,6 +583,12 @@ dialog::backdrop {
   font-family: 'Baloo 2', sans-serif;
   font-size: 0.95rem;
   margin: 4px 0 2px;
+}
+
+.help-note {
+  font-size: 0.8rem;
+  color: #8a8399;
+  margin: 0 0 6px;
 }
 
 .help-chart {

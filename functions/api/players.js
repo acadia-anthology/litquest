@@ -1,7 +1,7 @@
 const POINTS_PER_LEVEL = 100;
 
 // GET  /api/players  -> list every player with computed level, ranked by points (for the leaderboard)
-// POST /api/players   { name, avatar }  -> create a new player/profile
+// POST /api/players   { name, avatar, reader_type }  -> create a new player/profile
 
 export async function onRequestGet(context) {
   const { env } = context;
@@ -18,10 +18,12 @@ export async function onRequestPost(context) {
     return Response.json({ error: "name is required" }, { status: 400 });
   }
 
+  const readerType = body.reader_type === "adult" ? "adult" : "kid";
+
   const player = await env.DB.prepare(
-    "INSERT INTO players (name, avatar) VALUES (?, ?) RETURNING *"
+    "INSERT INTO players (name, avatar, reader_type) VALUES (?, ?, ?) RETURNING *"
   )
-    .bind(body.name.trim(), body.avatar?.trim() || "🧑")
+    .bind(body.name.trim(), body.avatar?.trim() || "🧑", readerType)
     .first();
 
   return Response.json(withLevel(player), { status: 201 });

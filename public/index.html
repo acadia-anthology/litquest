@@ -25,6 +25,10 @@
       <span class="level-badge" id="levelBadge">Lv 1</span>
       <div class="xp-track"><div class="xp-fill" id="xpFill"></div></div>
       <span class="points" id="pointsText">0 pts</span>
+      <select id="readerTypeSelect" title="Kid or adult scoring for this profile">
+        <option value="kid">🧒 Kid profile</option>
+        <option value="adult">🧑 Adult profile</option>
+      </select>
     </div>
 
     <button class="btn primary big" id="newQuestBtn">✨ New Quest (Add a Book)</button>
@@ -81,9 +85,9 @@
     <div class="modal-form help-modal">
       <h2>🏆 How Points Work</h2>
 
-      <p class="help-intro">Every book earns <strong>base points</strong> from its length, multiplied by how challenging its <strong>Lexile level</strong> is. Score <strong>80% or higher</strong> on the quiz to pass — points then scale with your score (80% correct = 80% of base points, 100% = full points). Below 80%, no points, and you get a fresh quiz to retry.</p>
+      <p class="help-intro">Every book earns <strong>base points</strong> from its length, multiplied by a challenge factor that depends on whether the profile is a <strong>Kid</strong> or <strong>Adult</strong> profile. Score <strong>80% or higher</strong> on the quiz to pass — points then scale with your score (80% correct = 80% of base points, 100% = full points). Below 80%, no points, and you get a fresh quiz to retry. Books below 4th grade can't be logged at all.</p>
 
-      <h3>Base points by length</h3>
+      <h3>Base points by length (everyone)</h3>
       <div class="help-chart">
         <div class="help-bar-row"><span class="help-bar-label">Under 40 pages</span><div class="help-bar-track"><div class="help-bar-fill" style="width:14%">10</div></div></div>
         <div class="help-bar-row"><span class="help-bar-label">40–160 pages</span><div class="help-bar-track"><div class="help-bar-fill" style="width:36%">25</div></div></div>
@@ -91,13 +95,30 @@
         <div class="help-bar-row"><span class="help-bar-label">320+ pages</span><div class="help-bar-track"><div class="help-bar-fill" style="width:100%">70</div></div></div>
       </div>
 
-      <h3>Lexile multiplier</h3>
+      <h3>🧒 Kid profiles: LitScore multiplier</h3>
+      <p class="help-note">LitScore is our own AI-estimated reading-difficulty number, in the same spirit as Lexile — not an official licensed score.</p>
       <div class="help-chart">
-        <div class="help-bar-row"><span class="help-bar-label">Under 500L</span><div class="help-bar-track"><div class="help-bar-fill alt" style="width:25%">0.5×</div></div></div>
-        <div class="help-bar-row"><span class="help-bar-label">500–799L</span><div class="help-bar-track"><div class="help-bar-fill alt" style="width:37%">0.75×</div></div></div>
-        <div class="help-bar-row"><span class="help-bar-label">800–999L</span><div class="help-bar-track"><div class="help-bar-fill alt" style="width:50%">1×</div></div></div>
-        <div class="help-bar-row"><span class="help-bar-label">1000–1199L</span><div class="help-bar-track"><div class="help-bar-fill alt" style="width:75%">1.5×</div></div></div>
-        <div class="help-bar-row"><span class="help-bar-label">1200L+</span><div class="help-bar-track"><div class="help-bar-fill alt" style="width:100%">2×</div></div></div>
+        <div class="help-bar-row"><span class="help-bar-label">Under 500</span><div class="help-bar-track"><div class="help-bar-fill alt" style="width:25%">0.5×</div></div></div>
+        <div class="help-bar-row"><span class="help-bar-label">500–799</span><div class="help-bar-track"><div class="help-bar-fill alt" style="width:37%">0.75×</div></div></div>
+        <div class="help-bar-row"><span class="help-bar-label">800–999</span><div class="help-bar-track"><div class="help-bar-fill alt" style="width:50%">1×</div></div></div>
+        <div class="help-bar-row"><span class="help-bar-label">1000–1199</span><div class="help-bar-track"><div class="help-bar-fill alt" style="width:75%">1.5×</div></div></div>
+        <div class="help-bar-row"><span class="help-bar-label">1200+</span><div class="help-bar-track"><div class="help-bar-fill alt" style="width:100%">2×</div></div></div>
+      </div>
+
+      <h3>🧑 Adult profiles: book type multiplier</h3>
+      <p class="help-note">A kids'/YA book isn't hard reading for an adult, so it's graded by type instead of LitScore.</p>
+      <div class="help-chart">
+        <div class="help-bar-row"><span class="help-bar-label">Elementary</span><div class="help-bar-track"><div class="help-bar-fill alt" style="width:25%">0.5×</div></div></div>
+        <div class="help-bar-row"><span class="help-bar-label">Middle Grade</span><div class="help-bar-track"><div class="help-bar-fill alt" style="width:30%">0.6×</div></div></div>
+        <div class="help-bar-row"><span class="help-bar-label">YA</span><div class="help-bar-track"><div class="help-bar-fill alt" style="width:40%">0.8×</div></div></div>
+      </div>
+
+      <h3>🧑 Adult profiles: Adult-book complexity</h3>
+      <p class="help-note">For books actually classified as Adult, the multiplier depends on how demanding the book itself is.</p>
+      <div class="help-chart">
+        <div class="help-bar-row"><span class="help-bar-label">Light</span><div class="help-bar-track"><div class="help-bar-fill alt" style="width:38%">0.75×</div></div></div>
+        <div class="help-bar-row"><span class="help-bar-label">Standard</span><div class="help-bar-track"><div class="help-bar-fill alt" style="width:50%">1×</div></div></div>
+        <div class="help-bar-row"><span class="help-bar-label">Complex</span><div class="help-bar-track"><div class="help-bar-fill alt" style="width:100%">2×</div></div></div>
       </div>
 
       <div class="modal-actions">
@@ -112,6 +133,12 @@
       <h2>👋 Add a Player</h2>
       <label>Name<input type="text" name="name" required placeholder="e.g. Dad" /></label>
       <label>Avatar emoji (optional)<input type="text" name="avatar" maxlength="4" placeholder="🧑" /></label>
+      <label>Profile type
+        <select name="reader_type">
+          <option value="kid">🧒 Kid — scored by grade level</option>
+          <option value="adult">🧑 Adult — scored by book type</option>
+        </select>
+      </label>
       <div class="modal-actions">
         <button type="button" class="btn" id="cancelAddPlayer">Cancel</button>
         <button type="submit" class="btn primary">Add Player</button>

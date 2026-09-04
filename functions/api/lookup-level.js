@@ -3,8 +3,10 @@
 // Confirms the book is real via Open Library (free, keyless, indexes new releases
 // almost immediately — fixes the AI not recognizing a book outside its training
 // data) and gets a real page count from there when available. Groq then estimates
-// just the Lexile measure and grade level, since no free API publishes that data.
-// Falls back to a pure AI guess if Open Library has no match at all.
+// the Lexile measure (shown to users as "LitScore" — these are AI estimates, not
+// officially licensed Lexile scores), grade level, book type, and complexity,
+// since no free API publishes any of that. Falls back to a pure AI guess if Open
+// Library has no match at all.
 
 export async function onRequestPost(context) {
   const { env, request } = context;
@@ -22,17 +24,27 @@ export async function onRequestPost(context) {
   const book = await findBook(title, author);
 
   if (!book) {
-    return Response.json(await aiFullGuess(env.GROQ_API_KEY, title, author));
+    return Response.json(toApiShape(await aiFullGuess(env.GROQ_API_KEY, title, author)));
   }
 
   const levelGuess = await estimateLevel(env.GROQ_API_KEY, book).catch(() => null);
 
-  return Response.json({
-    known: true,
-    grade_level: levelGuess?.grade_level ?? null,
-    lexile: levelGuess?.lexile ?? null,
-    pages: book.pages ?? levelGuess?.pages ?? null,
-  });
+  return Response.json(
+    toApiShape({
+      known: true,
+      ...levelGuess,
+      pages: book.pages ?? levelGuess?.pages ?? null,
+    })
+  );
+}
+
+// Renames the model's "lexile" field to "lit_score" at our API boundary — the
+// model understands "Lexile" as a concept, but we don't show that trademarked
+// term to users since these are our own estimates, not licensed Lexile scores.
+function toApiShape(result) {
+  if (!result?.known) return { known: false };
+  const { lexile, ...rest } = result;
+  return { ...rest, lit_score: lexile ?? null };
 }
 
 async function findBook(title, author) {
@@ -89,7 +101,7 @@ async function callGroq(apiKey, prompt) {
     },
     body: JSON.stringify({
       model: "openai/gpt-oss-120b",
-      max_tokens: 600,
+      max_tokens: 700,
       reasoning_effort: "low",
       messages: [{ role: "user", content: prompt }],
     }),
@@ -104,31 +116,46 @@ async function callGroq(apiKey, prompt) {
   return JSON.parse(text);
 }
 
+// Shared instructions for classifying grade band, type, and complexity —
+// used by both the grounded (Open Library found it) and blind-guess paths.
+const CLASSIFICATION_FIELDS = `- "grade_level": typical US school grade reading level as text, e.g. "4th grade"
+- "grade_level_num": the same thing as a plain number — 0 for Kindergarten, 1-12 for grades 1-12, or null if this is an adult book with no school grade level
+- "book_type": exactly one of "Elementary", "Middle Grade", "YA", or "Adult" (Elementary = K-5, Middle Grade = 6-8, YA = 9-12, Adult = adult fiction/nonfiction not aimed at school grades)
+- "complexity": exactly one of "Light", "Standard", or "Complex" — how demanding this book is FOR AN ADULT READER regardless of its grade level (Light = easy/quick read like a cozy mystery or simple romance; Standard = typical mainstream fiction/genre fiction; Complex = literary fiction, hard sci-fi, dense multi-POV epic fantasy, classics, or anything with intricate prose/structure). A children's book is still "Light" by this scale.`;
+
 async function estimateLevel(apiKey, book) {
   const needsPages = !book.pages;
   const prompt = `This is a real, published book: "${book.title}"${book.author ? ` by ${book.author}` : ""}${
     book.year ? ` (first published ${book.year})` : ""
   }.
 
-What is its approximate Lexile measure and typical US school grade reading level? Base it on the book, its genre, and (if you don't know this specific title) its author's similar work — give your best estimate even if you're not 100% certain, approximate is genuinely useful here.${
+Estimate its approximate Lexile measure and classify it. Base it on the book, its genre, and (if you don't know this specific title) its author's similar work — give your best estimate even if you're not 100% certain, approximate is genuinely useful here.${
     needsPages ? " Also estimate its typical print page count." : ""
   }
 
 Respond with ONLY this JSON, no other text, no markdown fences:
-{"lexile": "760L", "grade_level": "4th grade"${needsPages ? ', "pages": 160' : ""}}`;
+{"lexile": "760L", "grade_level": "4th grade", "grade_level_num": 4, "book_type": "Middle Grade", "complexity": "Standard"${
+    needsPages ? ', "pages": 160' : ""
+  }}
+
+Field meanings:
+${CLASSIFICATION_FIELDS}`;
 
   return callGroq(apiKey, prompt);
 }
 
 async function aiFullGuess(apiKey, title, author) {
-  const prompt = `What is the Lexile measure, typical US school grade reading level, and approximate print page count for the children's/YA book "${title}"${
+  const prompt = `What is the Lexile measure, page count, and grade/type/complexity classification for the children's/YA/adult book "${title}"${
     author ? ` by ${author}` : ""
   }?
 
 Give your best estimate even if you're not 100% certain of the exact numbers — approximate values are genuinely useful here, and being roughly right is much better than refusing to answer. Page count varies by edition, so just give a reasonable typical figure.
 
 If this is a real, identifiable book, respond with ONLY this JSON, no other text, no markdown fences:
-{"known": true, "lexile": "760L", "grade_level": "4th grade", "pages": 160}
+{"known": true, "lexile": "760L", "grade_level": "4th grade", "grade_level_num": 4, "book_type": "Middle Grade", "complexity": "Standard", "pages": 160}
+
+Field meanings:
+${CLASSIFICATION_FIELDS}
 
 Only respond with {"known": false} if you don't recognize the title/author as a real book at all.`;
 

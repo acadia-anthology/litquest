@@ -2,6 +2,7 @@ CREATE TABLE IF NOT EXISTS players (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL,
   avatar TEXT NOT NULL DEFAULT '🧑',
+  reader_type TEXT NOT NULL DEFAULT 'kid', -- kid | adult
   total_points INTEGER NOT NULL DEFAULT 0,
   books_completed INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
@@ -13,7 +14,9 @@ CREATE TABLE IF NOT EXISTS books (
   title TEXT NOT NULL,
   author TEXT,
   level TEXT,
-  lexile INTEGER,
+  lit_score INTEGER,
+  book_type TEXT, -- Elementary | Middle Grade | YA | Adult
+  complexity TEXT, -- Light | Standard | Complex (adult scoring only)
   pages INTEGER,
   word_count INTEGER NOT NULL,
   status TEXT NOT NULL DEFAULT 'reading', -- reading | quiz_ready | completed

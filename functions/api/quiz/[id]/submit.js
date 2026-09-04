@@ -11,15 +11,30 @@ function lengthTierPoints(wordCount) {
   return 70;
 }
 
-// Reward reading above grade level, scale back for books well below it.
-// Centered on a typical 6th-grade Lexile band (~800-1000L); no Lexile on file = neutral.
-function lexileMultiplier(lexile) {
-  if (lexile == null) return 1;
-  if (lexile < 500) return 0.5;
-  if (lexile < 800) return 0.75;
-  if (lexile < 1000) return 1;
-  if (lexile < 1200) return 1.5;
+// Kid scoring: reward reading above grade level, scale back for books well below it.
+// Centered on a typical 6th-grade LitScore band (~800-1000L); no score on file = neutral.
+function kidMultiplier(litScore) {
+  if (litScore == null) return 1;
+  if (litScore < 500) return 0.5;
+  if (litScore < 800) return 0.75;
+  if (litScore < 1000) return 1;
+  if (litScore < 1200) return 1.5;
   return 2;
+}
+
+// Adult scoring: a kids'/YA book isn't hard reading for an adult regardless of its
+// own LitScore, so grade by book_type instead — then within genuinely Adult books,
+// grade by complexity (a cozy mystery vs. dense literary fiction aren't equivalent).
+function adultMultiplier(bookType, complexity) {
+  if (bookType === "Elementary") return 0.5;
+  if (bookType === "Middle Grade") return 0.6;
+  if (bookType === "YA") return 0.8;
+  if (bookType === "Adult") {
+    if (complexity === "Light") return 0.75;
+    if (complexity === "Complex") return 2;
+    return 1; // Standard, or complexity unknown
+  }
+  return 1; // book_type unknown — neutral
 }
 
 export async function onRequestPost(context) {
@@ -52,11 +67,18 @@ export async function onRequestPost(context) {
   const book = await env.DB.prepare("SELECT * FROM books WHERE id = ?")
     .bind(quiz.book_id)
     .first();
+  const player = await env.DB.prepare("SELECT * FROM players WHERE id = ?")
+    .bind(book.player_id)
+    .first();
 
   const total = questions.length;
   const pct = score / total;
   const passed = pct >= PASS_THRESHOLD;
-  const basePoints = Math.round(lengthTierPoints(book.word_count) * lexileMultiplier(book.lexile));
+  const multiplier =
+    player.reader_type === "adult"
+      ? adultMultiplier(book.book_type, book.complexity)
+      : kidMultiplier(book.lit_score);
+  const basePoints = Math.round(lengthTierPoints(book.word_count) * multiplier);
   const pointsEarned = passed ? Math.round(basePoints * pct) : 0;
 
   await env.DB.prepare(
