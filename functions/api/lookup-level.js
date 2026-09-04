@@ -35,7 +35,7 @@ export async function onRequestPost(context) {
   }
 
   let book = await findBook(title, author);
-  const gb = await findGoogleBook(title, author).catch(() => null);
+  const gb = await findGoogleBook(title, author, env.GOOGLE_BOOKS_API_KEY).catch(() => null);
 
   let genreHint = gb?.genres?.length > 0 ? `Genre tags: ${gb.genres.join(", ")}` : null;
 

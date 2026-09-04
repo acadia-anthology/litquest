@@ -30,7 +30,7 @@ export async function onRequestPost(context) {
 
   let questions;
   try {
-    questions = await generateQuiz(env.GROQ_API_KEY, book);
+    questions = await generateQuiz(env.GROQ_API_KEY, book, env.GOOGLE_BOOKS_API_KEY);
   } catch (err) {
     return Response.json({ error: `Couldn't generate a quiz: ${err.message}` }, { status: 502 });
   }
@@ -80,7 +80,7 @@ const QUESTION_JSON_SHAPE = `Respond with ONLY valid JSON, no markdown fences, n
 const NO_TRIVIA_RULE =
   "Never ask about sales figures, awards, publication dates, adaptations, or other marketing/franchise trivia — only about the story itself: setting, characters, plot events, and themes.";
 
-async function generateQuiz(apiKey, book) {
+async function generateQuiz(apiKey, book, googleBooksKey) {
   // Blind AI recall confuses books that share a universe/author (e.g. it wrote
   // Hunger Games questions for "Sunrise on the Reaping"). Ground it with a real
   // plot summary instead of trusting memory alone — tries Wikipedia's dedicated
@@ -90,7 +90,7 @@ async function generateQuiz(apiKey, book) {
   // search sometimes surfaces the *author's* biography page instead of the book
   // when no dedicated article exists, which silently grounded questions in the
   // wrong content entirely before this).
-  const grounding = await findPlotSummary(book.title, book.author).catch(() => null);
+  const grounding = await findPlotSummary(book.title, book.author, googleBooksKey).catch(() => null);
 
   let prompt;
   if (grounding?.confidence === "high") {
@@ -138,7 +138,7 @@ ${QUESTION_JSON_SHAPE}`;
       book.author ? ` by ${book.author}` : ""
     }${book.level ? ` (reading level: ${book.level})` : ""}.
 
-Base the questions on the well-known plot, characters, and themes of this book. Test understanding of what happened in the story, not obscure trivia. Keep the language simple and age-appropriate for the reading level given. ${NO_TRIVIA_RULE}
+No real plot summary was available for this specific book, so you're relying on your own knowledge — be honest with yourself about how well you actually know THIS exact book, not just its series or author. If this is one entry in a series, do NOT invent specific character names, companions, pet names, or plot events unless you're genuinely confident they belong to this exact volume and not a different one — a wrong invented detail is worse than a more general question. When in doubt, prefer safer questions about the overall setting, genre, tone, or premise that would hold true across the series rather than guessing at specific events, named characters, or twists you're not sure about. Test understanding of what happened in the story, not obscure trivia. Keep the language simple and age-appropriate for the reading level given. ${NO_TRIVIA_RULE}
 
 ${QUESTION_JSON_SHAPE}`;
   }
@@ -198,11 +198,11 @@ function extractSection(fullText, headingName, maxLen) {
 // surface an unrelated page (most commonly the *author's own biography article*
 // when the book has no dedicated page of its own), and low-confidence text from
 // the wrong subject entirely is worse than no grounding at all.
-async function findPlotSummary(title, author) {
+async function findPlotSummary(title, author, googleBooksKey) {
   const wiki = await findWikipediaPlotSummary(title, author).catch(() => null);
   if (wiki?.confidence === "high") return wiki;
 
-  const gb = await findGoogleBook(title, author).catch(() => null);
+  const gb = await findGoogleBook(title, author, googleBooksKey).catch(() => null);
   if (gb?.description) return { text: gb.description, confidence: "publisher" };
 
   // Goodreads' anti-bot WAF blocks Cloudflare's network outright in practice, so

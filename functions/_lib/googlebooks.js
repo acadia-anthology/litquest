@@ -1,10 +1,15 @@
-// Google Books API (official, free, keyless — a real REST API, not a scrape) as
-// a plot/genre grounding source. Its free anonymous quota is shared and can be
-// thin, so a failure here just means "no data" — every caller falls through to
-// its next source rather than treating this as an error.
-export async function findGoogleBook(title, author) {
+// Google Books API — a real REST API, not a scrape, as a plot/genre grounding
+// source. IMPORTANT: unauthenticated requests get zero daily quota (confirmed
+// live — even Google's own textbook example query 429s with quota_limit_value
+// "0", not a temporary rate limit), so this only actually does anything once a
+// GOOGLE_BOOKS_API_KEY secret is set; until then apiKey is undefined, the `key`
+// param is omitted, and every call 429s and is caught below — same as any other
+// source having nothing, callers just fall through to their next option.
+export async function findGoogleBook(title, author, apiKey) {
   const q = `intitle:${title}${author ? `+inauthor:${author}` : ""}`;
-  const url = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&maxResults=1`;
+  const params = new URLSearchParams({ q, maxResults: "1" });
+  if (apiKey) params.set("key", apiKey);
+  const url = `https://www.googleapis.com/books/v1/volumes?${params}`;
 
   let res;
   try {
