@@ -191,17 +191,23 @@ function formatDate(dateStr) {
   return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 }
 
-function bookCard(book, actions) {
+function bookRow(book, actionBtn) {
   const div = document.createElement("div");
-  div.className = "card";
+  div.className = "book-row";
   const meta = [book.author, book.level].filter(Boolean).join(" · ");
   const dateLabel = book.finished_at
     ? `Started ${formatDate(book.added_at)} · Finished ${formatDate(book.finished_at)}`
     : `Started ${formatDate(book.added_at)}`;
 
+  const pointsBadge =
+    book.points_earned > 0 ? `<span class="points-badge">+${book.points_earned} pts</span>` : "";
+
   div.innerHTML = `
-    <h3>${escapeHtml(book.title)}</h3>
-    <div class="meta">${escapeHtml(meta || " ")}</div>
+    ${pointsBadge}
+    <div class="title-block">
+      <h3>${escapeHtml(book.title)}</h3>
+      <div class="meta">${escapeHtml(meta || " ")}</div>
+    </div>
     <div class="dates">
       <span class="date-label">${dateLabel}</span>
       <button type="button" class="edit-dates-btn" title="Edit dates">✏️</button>
@@ -212,7 +218,10 @@ function bookCard(book, actions) {
   div.querySelector(".edit-dates-btn").addEventListener("click", () => toggleDateEditor(div, book));
   div.querySelector(".delete-book-btn").addEventListener("click", () => deleteBook(book));
 
-  actions.forEach((a) => div.appendChild(a));
+  if (actionBtn) {
+    actionBtn.classList.add("action-btn");
+    div.appendChild(actionBtn);
+  }
   return div;
 }
 
@@ -262,32 +271,6 @@ function toggleDateEditor(cardEl, book) {
   cardEl.querySelector(".dates").after(form);
 }
 
-function completedRow(book) {
-  const div = document.createElement("div");
-  div.className = "completed-row";
-  const meta = [book.author, book.level].filter(Boolean).join(" · ");
-  const dateLabel = book.finished_at
-    ? `Started ${formatDate(book.added_at)} · Finished ${formatDate(book.finished_at)}`
-    : `Started ${formatDate(book.added_at)}`;
-
-  div.innerHTML = `
-    <div class="title-block">
-      <h3>${escapeHtml(book.title)}</h3>
-      <div class="meta">${escapeHtml(meta || " ")}</div>
-    </div>
-    <div class="dates">
-      <span class="date-label">${dateLabel}</span>
-      <button type="button" class="edit-dates-btn" title="Edit dates">✏️</button>
-      <button type="button" class="delete-book-btn" title="Delete this book">🗑️</button>
-    </div>
-  `;
-
-  div.querySelector(".edit-dates-btn").addEventListener("click", () => toggleDateEditor(div, book));
-  div.querySelector(".delete-book-btn").addEventListener("click", () => deleteBook(book));
-
-  return div;
-}
-
 function makeButton(label, onClick, primary = true) {
   const btn = document.createElement("button");
   btn.className = `btn${primary ? " primary" : ""}`;
@@ -313,16 +296,16 @@ async function loadBooks() {
 
   reading.forEach((b) => {
     const finishBtn = makeButton("Finished it! 🎉", () => startQuiz(b));
-    readingCards.appendChild(bookCard(b, [finishBtn]));
+    readingCards.appendChild(bookRow(b, finishBtn));
   });
 
   quizReady.forEach((b) => {
     const quizBtn = makeButton("Take Quiz 📝", () => startQuiz(b));
-    quizReadyCards.appendChild(bookCard(b, [quizBtn]));
+    quizReadyCards.appendChild(bookRow(b, quizBtn));
   });
 
   completed.forEach((b) => {
-    completedCards.appendChild(completedRow(b));
+    completedCards.appendChild(bookRow(b));
   });
 }
 

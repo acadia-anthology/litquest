@@ -14,7 +14,9 @@ export async function onRequestGet(context) {
     return Response.json({ error: "player_id query param is required" }, { status: 400 });
   }
   const { results } = await env.DB.prepare(
-    "SELECT * FROM books WHERE player_id = ? ORDER BY added_at DESC"
+    `SELECT books.*,
+            COALESCE((SELECT SUM(points_earned) FROM quiz_attempts WHERE quiz_attempts.book_id = books.id), 0) AS points_earned
+     FROM books WHERE player_id = ? ORDER BY added_at DESC`
   )
     .bind(playerId)
     .all();

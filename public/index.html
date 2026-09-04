@@ -29,15 +29,14 @@
 
     <button class="btn primary big" id="newQuestBtn">✨ New Quest (Add a Book)</button>
 
-    <section class="board" id="board">
-      <div class="column">
-        <h2><span class="section-badge">📖 Reading</span></h2>
-        <div class="cards" id="readingCards"></div>
-      </div>
-      <div class="column">
-        <h2><span class="section-badge">❓ Quiz Ready</span></h2>
-        <div class="cards" id="quizReadyCards"></div>
-      </div>
+    <section class="book-section" id="board">
+      <h2><span class="section-badge">📖 Reading</span></h2>
+      <div class="book-rows" id="readingCards"></div>
+    </section>
+
+    <section class="book-section">
+      <h2><span class="section-badge">❓ Quiz Ready</span></h2>
+      <div class="book-rows" id="quizReadyCards"></div>
     </section>
 
     <section class="leaderboard">
@@ -53,9 +52,9 @@
       <div id="bookBarChart"></div>
     </section>
 
-    <section class="completed-section">
+    <section class="book-section">
       <h2>🏆 Completed</h2>
-      <div class="completed-rows" id="completedCards"></div>
+      <div class="book-rows" id="completedCards"></div>
     </section>
   </main>
 

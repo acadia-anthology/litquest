@@ -177,17 +177,11 @@ main {
   box-shadow: 0 8px 20px rgba(124,92,255,0.35);
 }
 
-.board {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 20px;
+.book-section {
+  margin-bottom: 32px;
 }
 
-@media (max-width: 800px) {
-  .board { grid-template-columns: 1fr; }
-}
-
-.column h2 {
+.book-section h2 {
   font-size: 1.1rem;
   margin-bottom: 10px;
 }
@@ -198,20 +192,6 @@ main {
   color: var(--purple);
   padding: 6px 16px;
   border-radius: 999px;
-}
-
-.cards {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  min-height: 60px;
-}
-
-.card {
-  background: var(--card);
-  border-radius: 16px;
-  padding: 14px 16px;
-  box-shadow: 0 4px 14px rgba(43,36,64,0.08);
 }
 
 .leaderboard {
@@ -250,15 +230,6 @@ main {
   flex: 1;
 }
 
-.card .dates {
-  font-size: 0.8rem;
-  color: #a79fc2;
-  margin-bottom: 10px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
 .edit-dates-btn {
   border: none;
   background: none;
@@ -291,7 +262,7 @@ main {
   margin-bottom: 10px;
 }
 
-.completed-row .edit-dates-form {
+.book-row .edit-dates-form {
   flex-basis: 100%;
   margin-bottom: 0;
 }
@@ -416,23 +387,14 @@ main {
   text-align: right;
 }
 
-.completed-section {
-  margin-top: 40px;
-  margin-bottom: 20px;
-}
-
-.completed-section h2 {
-  font-size: 1.1rem;
-  margin-bottom: 14px;
-}
-
-.completed-rows {
+.book-rows {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  min-height: 40px;
 }
 
-.completed-row {
+.book-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -444,17 +406,17 @@ main {
   box-shadow: 0 4px 14px rgba(43,36,64,0.06);
 }
 
-.completed-row .title-block h3 {
+.book-row .title-block h3 {
   margin: 0 0 2px;
   font-size: 1rem;
 }
 
-.completed-row .meta {
+.book-row .meta {
   font-size: 0.85rem;
   color: #8a8399;
 }
 
-.completed-row .dates {
+.book-row .dates {
   margin: 0;
   font-size: 0.8rem;
   color: #a79fc2;
@@ -464,18 +426,20 @@ main {
   white-space: nowrap;
 }
 
-.card h3 {
-  margin: 0 0 4px;
-  font-size: 1.05rem;
+.book-row .action-btn {
+  white-space: nowrap;
 }
 
-.card .meta {
-  font-size: 0.85rem;
-  color: #8a8399;
-  margin-bottom: 10px;
+.points-badge {
+  background: var(--pink);
+  color: white;
+  font-weight: 800;
+  font-size: 0.8rem;
+  padding: 5px 12px;
+  border-radius: 999px;
+  white-space: nowrap;
+  order: -1;
 }
-
-.card .btn { width: 100%; }
 
 .empty-hint {
   color: #a79fc2;
