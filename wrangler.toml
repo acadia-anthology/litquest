@@ -5,4 +5,4 @@ compatibility_date = "2026-09-03"
 [[d1_databases]]
 binding = "DB"
 database_name = "litquest-db"
-database_id = "REPLACE_ME_AFTER_WRANGLER_D1_CREATE"
+database_id = "c43b1002-d5e7-4668-be2b-f1ed0399e407"
