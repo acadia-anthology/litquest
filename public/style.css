@@ -47,10 +47,45 @@ h1, h2, .brand, .btn {
   gap: 8px;
 }
 
+.player-switcher {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.player-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 2px solid transparent;
+  background: #ece9ff;
+  color: var(--text);
+  font-family: 'Nunito', sans-serif;
+  font-weight: 700;
+  padding: 6px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.player-pill.active {
+  background: white;
+  border-color: var(--purple);
+  color: var(--purple);
+  box-shadow: 0 2px 8px rgba(124,92,255,0.25);
+}
+
+.player-pill.add-player {
+  background: transparent;
+  border: 2px dashed #c9c2f0;
+  color: #8a8399;
+}
+
 .profile-bar {
   display: flex;
   align-items: center;
   gap: 10px;
+  margin-bottom: 20px;
 }
 
 .level-badge {
@@ -141,6 +176,48 @@ main {
   box-shadow: 0 4px 14px rgba(43,36,64,0.08);
 }
 
+.leaderboard {
+  margin-top: 40px;
+}
+
+.leaderboard h2 {
+  font-size: 1.1rem;
+  margin-bottom: 10px;
+}
+
+.leaderboard-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: var(--card);
+  border-radius: 14px;
+  padding: 12px 18px;
+  margin-bottom: 10px;
+  box-shadow: 0 4px 14px rgba(43,36,64,0.06);
+}
+
+.leaderboard-row .rank {
+  font-weight: 800;
+  font-size: 1.2rem;
+  color: var(--purple);
+  width: 28px;
+}
+
+.leaderboard-row .avatar {
+  font-size: 1.4rem;
+}
+
+.leaderboard-row .name {
+  font-weight: 700;
+  flex: 1;
+}
+
+.leaderboard-row .stats {
+  font-size: 0.9rem;
+  color: #8a8399;
+  text-align: right;
+}
+
 .card h3 {
   margin: 0 0 4px;
   font-size: 1.05rem;
@@ -193,6 +270,12 @@ dialog::backdrop {
   padding: 10px 12px;
   border-radius: 10px;
   border: 2px solid #e6e1ff;
+}
+
+.lookup-status {
+  margin: -4px 0 0;
+  font-size: 0.85rem;
+  color: #8a8399;
 }
 
 .modal-actions {

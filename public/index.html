@@ -14,14 +14,16 @@
 <body>
   <header class="topbar">
     <div class="brand">📚 <span>Litquest</span></div>
+    <div class="player-switcher" id="playerSwitcher"></div>
+  </header>
+
+  <main>
     <div class="profile-bar" id="profileBar">
       <span class="level-badge" id="levelBadge">Lv 1</span>
       <div class="xp-track"><div class="xp-fill" id="xpFill"></div></div>
       <span class="points" id="pointsText">0 pts</span>
     </div>
-  </header>
 
-  <main>
     <button class="btn primary big" id="newQuestBtn">✨ New Quest (Add a Book)</button>
 
     <section class="board" id="board">
@@ -38,6 +40,11 @@
         <div class="cards" id="completedCards"></div>
       </div>
     </section>
+
+    <section class="leaderboard">
+      <h2>🥇 Leaderboard</h2>
+      <div id="leaderboardList"></div>
+    </section>
   </main>
 
   <!-- Add book modal -->
@@ -47,10 +54,24 @@
       <label>Book Title<input type="text" name="title" required placeholder="e.g. Charlotte's Web" /></label>
       <label>Author (optional)<input type="text" name="author" placeholder="e.g. E.B. White" /></label>
       <label>About how many pages? (optional)<input type="number" name="pages" min="1" placeholder="e.g. 180" /></label>
-      <label>Reading level (optional)<input type="text" name="level" placeholder="e.g. 3rd grade" /></label>
+      <label>Reading level (optional)<input type="text" name="level" id="levelInput" placeholder="e.g. 3rd grade" /></label>
+      <p class="lookup-status" id="lookupStatus" hidden></p>
       <div class="modal-actions">
         <button type="button" class="btn" id="cancelAddBook">Cancel</button>
         <button type="submit" class="btn primary">Start Reading</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Add player modal -->
+  <dialog id="addPlayerModal">
+    <form id="addPlayerForm" class="modal-form">
+      <h2>👋 Add a Player</h2>
+      <label>Name<input type="text" name="name" required placeholder="e.g. Dad" /></label>
+      <label>Avatar emoji (optional)<input type="text" name="avatar" maxlength="4" placeholder="🧑" /></label>
+      <div class="modal-actions">
+        <button type="button" class="btn" id="cancelAddPlayer">Cancel</button>
+        <button type="submit" class="btn primary">Add Player</button>
       </div>
     </form>
   </dialog>

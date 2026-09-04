@@ -1,5 +1,5 @@
 // POST /api/quiz/:id/submit  { answers: [chosen_index, ...] }
-// Grades the quiz, awards points on a passing score (>=60%), updates the profile.
+// Grades the quiz, awards points on a passing score (>=60%), updates the book's player.
 
 const PASS_THRESHOLD = 0.6;
 
@@ -41,9 +41,9 @@ export async function onRequestPost(context) {
   const pointsEarned = passed ? Math.round(basePoints * pct) : 0;
 
   await env.DB.prepare(
-    "INSERT INTO quiz_attempts (quiz_id, book_id, score, total, points_earned) VALUES (?, ?, ?, ?, ?)"
+    "INSERT INTO quiz_attempts (quiz_id, book_id, player_id, score, total, points_earned) VALUES (?, ?, ?, ?, ?, ?)"
   )
-    .bind(params.id, quiz.book_id, score, total, pointsEarned)
+    .bind(params.id, quiz.book_id, book.player_id, score, total, pointsEarned)
     .run();
 
   if (passed) {
@@ -53,9 +53,9 @@ export async function onRequestPost(context) {
       .bind(quiz.book_id)
       .run();
     await env.DB.prepare(
-      "UPDATE profile SET total_points = total_points + ?, books_completed = books_completed + 1 WHERE id = 1"
+      "UPDATE players SET total_points = total_points + ?, books_completed = books_completed + 1 WHERE id = ?"
     )
-      .bind(pointsEarned)
+      .bind(pointsEarned, book.player_id)
       .run();
   } else {
     // Failing keeps the book in quiz_ready so she can retake it after a re-read/refresh.

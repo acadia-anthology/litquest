@@ -90,7 +90,8 @@ Respond with ONLY valid JSON, no markdown fences, no other text, in exactly this
     },
     body: JSON.stringify({
       model: "openai/gpt-oss-120b",
-      max_tokens: 1500,
+      max_tokens: 2000,
+      reasoning_effort: "low",
       messages: [{ role: "user", content: prompt }],
     }),
   });
