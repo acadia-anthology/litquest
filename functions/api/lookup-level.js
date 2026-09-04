@@ -1,5 +1,5 @@
 // POST /api/lookup-level  { title, author }
-// Asks Groq for a well-known book's Lexile measure and grade-level band.
+// Asks Groq for a well-known book's Lexile measure, grade-level band, and typical page count.
 
 export async function onRequestPost(context) {
   const { env, request } = context;
@@ -14,14 +14,14 @@ export async function onRequestPost(context) {
     return Response.json({ error: "Server is missing GROQ_API_KEY" }, { status: 500 });
   }
 
-  const prompt = `What is the Lexile measure and typical US school grade reading level for the children's/YA book "${title}"${
+  const prompt = `What is the Lexile measure, typical US school grade reading level, and approximate print page count for the children's/YA book "${title}"${
     author ? ` by ${author}` : ""
   }?
 
-Give your best estimate even if you're not 100% certain of the exact number — an approximate Lexile and grade level is genuinely useful here, and being roughly right is much better than refusing to answer.
+Give your best estimate even if you're not 100% certain of the exact numbers — approximate values are genuinely useful here, and being roughly right is much better than refusing to answer. Page count varies by edition, so just give a reasonable typical figure.
 
 If this is a real, identifiable book, respond with ONLY this JSON, no other text, no markdown fences:
-{"known": true, "lexile": "760L", "grade_level": "4th grade"}
+{"known": true, "lexile": "760L", "grade_level": "4th grade", "pages": 160}
 
 Only respond with {"known": false} if you don't recognize the title/author as a real book at all.`;
 

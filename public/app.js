@@ -6,6 +6,10 @@ const addBookModal = document.getElementById("addBookModal");
 const addPlayerModal = document.getElementById("addPlayerModal");
 const quizModal = document.getElementById("quizModal");
 const resultModal = document.getElementById("resultModal");
+const helpModal = document.getElementById("helpModal");
+
+document.getElementById("helpBtn").addEventListener("click", () => helpModal.showModal());
+document.getElementById("closeHelp").addEventListener("click", () => helpModal.close());
 
 const newQuestBtn = document.getElementById("newQuestBtn");
 const board = document.getElementById("board");
@@ -288,8 +292,6 @@ async function loadBooks() {
 const addBookForm = document.getElementById("addBookForm");
 const titleInput = addBookForm.querySelector('[name="title"]');
 const authorInput = addBookForm.querySelector('[name="author"]');
-const levelInput = document.getElementById("levelInput");
-const lexileInput = document.getElementById("lexileInput");
 const lookupStatus = document.getElementById("lookupStatus");
 const startedInput = document.getElementById("startedInput");
 const finishedInput = document.getElementById("finishedInput");
@@ -311,6 +313,7 @@ function resetAddBookForm() {
   addBookSubmitBtn.textContent = "Start Reading";
   lookupStatus.hidden = true;
   lookupToken++;
+  lastLookupResult = null;
 }
 
 alreadyFinishedCheckbox.addEventListener("change", () => {
@@ -330,14 +333,26 @@ document.getElementById("cancelAddBook").addEventListener("click", () => {
 });
 
 let lookupToken = 0;
+let lastLookupResult = null; // { grade_level, lexile, pages } — drives scoring, not user-editable
+
+// Any edit after a lookup invalidates it, so a stale result for a since-changed
+// title/author never gets submitted.
+function invalidateLookup() {
+  if (lastLookupResult !== null) {
+    lastLookupResult = null;
+    lookupStatus.hidden = true;
+  }
+}
+titleInput.addEventListener("input", invalidateLookup);
+authorInput.addEventListener("input", invalidateLookup);
 
 async function tryAutoLookupLevel() {
   const title = titleInput.value.trim();
-  if (!title || levelInput.value.trim()) return; // don't overwrite a level the user already typed
+  if (!title) return;
 
   const myToken = ++lookupToken;
   lookupStatus.hidden = false;
-  lookupStatus.textContent = "🔍 Looking up reading level...";
+  lookupStatus.textContent = "🔍 Looking up this book...";
 
   try {
     const result = await api("/api/lookup-level", {
@@ -347,16 +362,16 @@ async function tryAutoLookupLevel() {
     if (myToken !== lookupToken) return; // a newer lookup superseded this one
 
     if (result.known) {
-      levelInput.value = `${result.grade_level} · Lexile ${result.lexile}`;
-      const lexileNum = parseInt(result.lexile, 10);
-      if (!lexileInput.value.trim() && Number.isFinite(lexileNum)) lexileInput.value = lexileNum;
-      lookupStatus.textContent = `Found it: ${result.grade_level}, Lexile ${result.lexile}`;
+      lastLookupResult = result;
+      lookupStatus.textContent = `📖 ${result.grade_level} · Lexile ${result.lexile} · ~${result.pages} pages`;
     } else {
-      lookupStatus.textContent = "Couldn't find a reading level for this one — enter it manually if you know it.";
+      lastLookupResult = null;
+      lookupStatus.textContent = "Couldn't identify this book — it'll use default scoring (short book, no level bonus).";
     }
   } catch {
     if (myToken !== lookupToken) return;
-    lookupStatus.textContent = "Reading-level lookup failed — enter it manually if you know it.";
+    lastLookupResult = null;
+    lookupStatus.textContent = "Lookup failed — it'll use default scoring (short book, no level bonus).";
   }
 }
 
@@ -372,9 +387,9 @@ addBookForm.addEventListener("submit", async (e) => {
     player_id: activePlayerId,
     title: form.title.value,
     author: form.author.value,
-    pages: form.pages.value,
-    level: form.level.value,
-    lexile: lexileInput.value,
+    pages: lastLookupResult?.pages ?? "",
+    level: lastLookupResult ? `${lastLookupResult.grade_level} · Lexile ${lastLookupResult.lexile}` : "",
+    lexile: lastLookupResult ? parseInt(lastLookupResult.lexile, 10) : "",
     added_at: startedInput.value,
     finished_at: alreadyFinishedCheckbox.checked ? finishedInput.value : null,
   };

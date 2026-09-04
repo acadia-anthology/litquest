@@ -14,7 +14,10 @@
 <body>
   <header class="topbar">
     <div class="brand">📚 <span>Litquest</span></div>
-    <div class="player-switcher" id="playerSwitcher"></div>
+    <div class="topbar-right">
+      <div class="player-switcher" id="playerSwitcher"></div>
+      <button type="button" class="help-btn" id="helpBtn" title="How points work">?</button>
+    </div>
   </header>
 
   <main>
@@ -61,9 +64,6 @@
       <h2>✨ Start a New Quest</h2>
       <label>Book Title<input type="text" name="title" required placeholder="e.g. Charlotte's Web" /></label>
       <label>Author (optional)<input type="text" name="author" placeholder="e.g. E.B. White" /></label>
-      <label>About how many pages? (optional)<input type="number" name="pages" min="1" placeholder="e.g. 180" /></label>
-      <label>Reading level (optional)<input type="text" name="level" id="levelInput" placeholder="e.g. 3rd grade" /></label>
-      <label>Lexile number (optional)<input type="number" name="lexile" id="lexileInput" placeholder="e.g. 760" /></label>
       <p class="lookup-status" id="lookupStatus" hidden></p>
       <label>Date started<input type="date" name="started" id="startedInput" required /></label>
       <label class="checkbox-row"><input type="checkbox" name="already_finished" id="alreadyFinishedCheckbox" /> Already finished this one</label>
@@ -74,6 +74,36 @@
         <button type="submit" class="btn primary" id="addBookSubmitBtn">Start Reading</button>
       </div>
     </form>
+  </dialog>
+
+  <!-- How points work modal -->
+  <dialog id="helpModal">
+    <div class="modal-form help-modal">
+      <h2>🏆 How Points Work</h2>
+
+      <p class="help-intro">Every book earns <strong>base points</strong> from its length, multiplied by how challenging its <strong>Lexile level</strong> is. Score <strong>80% or higher</strong> on the quiz to pass — points then scale with your score (80% correct = 80% of base points, 100% = full points). Below 80%, no points, and you get a fresh quiz to retry.</p>
+
+      <h3>Base points by length</h3>
+      <div class="help-chart">
+        <div class="help-bar-row"><span class="help-bar-label">Under 40 pages</span><div class="help-bar-track"><div class="help-bar-fill" style="width:14%">10</div></div></div>
+        <div class="help-bar-row"><span class="help-bar-label">40–160 pages</span><div class="help-bar-track"><div class="help-bar-fill" style="width:36%">25</div></div></div>
+        <div class="help-bar-row"><span class="help-bar-label">160–320 pages</span><div class="help-bar-track"><div class="help-bar-fill" style="width:64%">45</div></div></div>
+        <div class="help-bar-row"><span class="help-bar-label">320+ pages</span><div class="help-bar-track"><div class="help-bar-fill" style="width:100%">70</div></div></div>
+      </div>
+
+      <h3>Lexile multiplier</h3>
+      <div class="help-chart">
+        <div class="help-bar-row"><span class="help-bar-label">Under 500L</span><div class="help-bar-track"><div class="help-bar-fill alt" style="width:25%">0.5×</div></div></div>
+        <div class="help-bar-row"><span class="help-bar-label">500–799L</span><div class="help-bar-track"><div class="help-bar-fill alt" style="width:37%">0.75×</div></div></div>
+        <div class="help-bar-row"><span class="help-bar-label">800–999L</span><div class="help-bar-track"><div class="help-bar-fill alt" style="width:50%">1×</div></div></div>
+        <div class="help-bar-row"><span class="help-bar-label">1000–1199L</span><div class="help-bar-track"><div class="help-bar-fill alt" style="width:75%">1.5×</div></div></div>
+        <div class="help-bar-row"><span class="help-bar-label">1200L+</span><div class="help-bar-track"><div class="help-bar-fill alt" style="width:100%">2×</div></div></div>
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn primary" id="closeHelp">Got it!</button>
+      </div>
+    </div>
   </dialog>
 
   <!-- Add player modal -->

@@ -47,11 +47,41 @@ h1, h2, .brand, .btn {
   gap: 8px;
 }
 
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
 .player-switcher {
   display: flex;
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.help-btn {
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  border-radius: 50%;
+  border: 2px solid var(--purple);
+  background: white;
+  color: var(--purple);
+  font-family: 'Baloo 2', sans-serif;
+  font-weight: 800;
+  font-size: 1rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.help-btn:hover {
+  background: var(--purple);
+  color: white;
 }
 
 .player-pill {
@@ -469,3 +499,65 @@ dialog::backdrop {
 
 .result-pass { color: var(--green); font-weight: 700; }
 .result-fail { color: var(--pink); font-weight: 700; }
+
+#helpModal {
+  width: min(520px, 92vw);
+}
+
+.help-intro {
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: var(--text);
+  margin: 0;
+}
+
+.help-modal h3 {
+  font-family: 'Baloo 2', sans-serif;
+  font-size: 0.95rem;
+  margin: 4px 0 2px;
+}
+
+.help-chart {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.help-bar-row {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  align-items: center;
+  gap: 10px;
+}
+
+.help-bar-label {
+  font-size: 0.8rem;
+  color: #8a8399;
+  white-space: nowrap;
+}
+
+.help-bar-track {
+  background: #ece9ff;
+  border-radius: 999px;
+  height: 22px;
+  overflow: hidden;
+}
+
+.help-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--purple), var(--pink));
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: 8px;
+  color: white;
+  font-size: 0.75rem;
+  font-weight: 700;
+  min-width: 32px;
+  box-sizing: border-box;
+}
+
+.help-bar-fill.alt {
+  background: linear-gradient(90deg, var(--orange), var(--pink));
+}
