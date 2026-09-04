@@ -1,6 +1,7 @@
 // GET  /api/books/:id/quiz  -> return the latest quiz (no answers), 404 if none generated yet
 // POST /api/books/:id/quiz  -> generate a FRESH quiz via Groq (first attempt or a retake) and return it
 
+import { findGoogleBook } from "../../../_lib/googlebooks.js";
 import { findGoodreadsBook } from "../../../_lib/goodreads.js";
 
 export async function onRequestGet(context) {
@@ -104,7 +105,7 @@ Using ONLY the events, characters, and details in that summary — not anything 
     }. Test understanding of what actually happened in the story, not obscure trivia. Keep the language simple and age-appropriate. ${NO_TRIVIA_RULE}
 
 ${QUESTION_JSON_SHAPE}`;
-  } else if (grounding?.confidence === "goodreads") {
+  } else if (grounding?.confidence === "publisher") {
     prompt = `Here is the real publisher's description of the book "${book.title}"${book.author ? ` by ${book.author}` : ""}:
 
 """
@@ -189,8 +190,9 @@ function extractSection(fullText, headingName, maxLen) {
 
 // Tries, in order: a dedicated Wikipedia "Plot"/"Synopsis" section (best case,
 // but most books — especially anything without its own Wikipedia article at
-// all — don't have one); Goodreads' publisher description (exists for nearly
-// every book, and is guaranteed to actually be about this book); then finally
+// all — don't have one); the publisher description from Google Books' official
+// API or (if that has nothing) scraped from Goodreads — either way, real
+// book-specific back-cover copy that exists for nearly every book; then finally
 // Wikipedia's weaker Premise/Characters/lead-paragraph fallback. That fallback
 // is deliberately tried last and only as a last resort — Wikipedia's search can
 // surface an unrelated page (most commonly the *author's own biography article*
@@ -200,8 +202,13 @@ async function findPlotSummary(title, author) {
   const wiki = await findWikipediaPlotSummary(title, author).catch(() => null);
   if (wiki?.confidence === "high") return wiki;
 
+  const gb = await findGoogleBook(title, author).catch(() => null);
+  if (gb?.description) return { text: gb.description, confidence: "publisher" };
+
+  // Goodreads' anti-bot WAF blocks Cloudflare's network outright in practice, so
+  // this is a last-ditch attempt (2 quick tries) rather than something relied on.
   const gr = await findGoodreadsBook(title, author, 2).catch(() => null);
-  if (gr?.description) return { text: gr.description, confidence: "goodreads" };
+  if (gr?.description) return { text: gr.description, confidence: "publisher" };
 
   return wiki;
 }

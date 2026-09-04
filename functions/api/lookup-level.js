@@ -3,18 +3,22 @@
 // Confirms the book is real via Open Library (free, keyless, indexes new releases
 // almost immediately) and gets a real page count from there when available — but
 // Open Library has no genre/audience data at all, found or not, so a genre hint
-// is always separately sought: first from scraping Goodreads (no official API,
-// same technique used for this same purpose elsewhere; real genre tags like
-// "Young Adult" or "Romance" are a much stronger classification signal than a
-// prose extract), falling back to Wikipedia's lead paragraph if Goodreads has
-// nothing. If Open Library also has no match at all — real coverage gaps exist,
-// especially graphic novels, newer YA, and small/indie releases — the Goodreads
-// result is promoted to stand in for Open Library's page count too. Groq then
-// estimates the Lexile measure (shown to users as "LitScore" — these are AI
-// estimates, not officially licensed Lexile scores), grade level, book type, and
-// complexity. Only falls back to a pure blind AI guess if none of the above find
-// the book at all.
+// is always separately sought: first from the official Google Books API (real
+// BISAC category tags like "Young Adult Fiction" or "Fiction / Romance" — a much
+// stronger classification signal than a prose extract, and a real REST API, not
+// a scrape), falling back to scraping Goodreads if Google Books has nothing, and
+// Wikipedia's lead paragraph as the last resort. (Goodreads' anti-bot WAF blocks
+// Cloudflare's own network outright in practice — confirmed live, not assumed —
+// so it's kept only as a fallback behind Google Books, not relied on primarily.)
+// If Open Library also has no match at all — real coverage gaps exist,
+// especially graphic novels, newer YA, and small/indie releases — whichever
+// other source found the book is promoted to stand in for Open Library's page
+// count too. Groq then estimates the Lexile measure (shown to users as
+// "LitScore" — these are AI estimates, not officially licensed Lexile scores),
+// grade level, book type, and complexity. Only falls back to a pure blind AI
+// guess if none of the above find the book at all.
 
+import { findGoogleBook } from "../_lib/googlebooks.js";
 import { findGoodreadsBook } from "../_lib/goodreads.js";
 
 export async function onRequestPost(context) {
@@ -31,26 +35,36 @@ export async function onRequestPost(context) {
   }
 
   let book = await findBook(title, author);
+  const gb = await findGoogleBook(title, author).catch(() => null);
 
-  // Goodreads' WAF sometimes challenges/blocks scraper traffic outright — when
-  // Open Library already confirmed the book, this is pure enrichment, so it
-  // gets exactly one quick attempt rather than the patient retry below; a miss
-  // here just falls through to Wikipedia instead of costing the whole request
-  // several extra seconds of retry/backoff.
-  const gr = await findGoodreadsBook(title, author, book ? 1 : 3).catch(() => null);
+  let genreHint = gb?.genres?.length > 0 ? `Genre tags: ${gb.genres.join(", ")}` : null;
 
-  if (!book && gr) {
-    book = { title, author: author || null, year: null, pages: gr.pages };
+  if (!book && gb) {
+    book = { title, author: author || null, year: null, pages: gb.pages };
+  }
+
+  if (!book || !genreHint) {
+    // Goodreads' WAF sometimes challenges/blocks scraper traffic outright — when
+    // there's already a book and/or genre hint, this is pure enrichment, so it
+    // gets exactly one quick attempt rather than the patient retry below; a miss
+    // here just falls through to Wikipedia instead of costing the whole request
+    // several extra seconds of retry/backoff.
+    const gr = await findGoodreadsBook(title, author, book && genreHint ? 1 : 3).catch(() => null);
+    if (!book && gr) {
+      book = { title, author: author || null, year: null, pages: gr.pages };
+    }
+    if (!genreHint && gr?.genres?.length > 0) {
+      genreHint = `Genre tags: ${gr.genres.join(", ")}`;
+    }
   }
 
   if (!book) {
     return Response.json(toApiShape(await aiFullGuess(env.GROQ_API_KEY, title, author)));
   }
 
-  const genreHint =
-    gr?.genres?.length > 0
-      ? `Genre tags: ${gr.genres.join(", ")}`
-      : await findWikipediaGenreHint(book.title, book.author).catch(() => null);
+  if (!genreHint) {
+    genreHint = await findWikipediaGenreHint(book.title, book.author).catch(() => null);
+  }
 
   const levelGuess = await estimateLevel(env.GROQ_API_KEY, book, genreHint).catch(() => null);
 
