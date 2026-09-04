@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS books (
   title TEXT NOT NULL,
   author TEXT,
   level TEXT,
+  lexile INTEGER,
   word_count INTEGER NOT NULL,
   status TEXT NOT NULL DEFAULT 'reading', -- reading | quiz_ready | completed
   added_at TEXT NOT NULL DEFAULT (datetime('now')),

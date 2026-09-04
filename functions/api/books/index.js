@@ -1,5 +1,11 @@
 // GET  /api/books?player_id=1  -> list that player's books (player_id required)
-// POST /api/books               { player_id, title, author, pages, level }
+// POST /api/books               { player_id, title, author, pages, level, added_at }
+
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+function todayDate() {
+  return new Date().toISOString().slice(0, 10);
+}
 
 export async function onRequestGet(context) {
   const { env, request } = context;
@@ -29,17 +35,29 @@ export async function onRequestPost(context) {
   // Kids know page counts, not word counts — estimate ~250 words/page.
   const pages = Number(body.pages) || 0;
   const word_count = pages > 0 ? Math.round(pages * 250) : 5000;
+  const lexile = Number.isFinite(Number(body.lexile)) && body.lexile !== "" ? Math.round(Number(body.lexile)) : null;
+
+  const addedAt = DATE_RE.test(body.added_at) ? body.added_at : todayDate();
+
+  // Logging an already-read book (no quiz/points — just a record for the backlog).
+  const alreadyFinished = DATE_RE.test(body.finished_at);
+  const status = alreadyFinished ? "completed" : "reading";
+  const finishedAt = alreadyFinished ? body.finished_at : null;
 
   const book = await env.DB.prepare(
-    `INSERT INTO books (player_id, title, author, level, word_count, status)
-     VALUES (?, ?, ?, ?, ?, 'reading') RETURNING *`
+    `INSERT INTO books (player_id, title, author, level, lexile, word_count, status, added_at, finished_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`
   )
     .bind(
       body.player_id,
       body.title.trim(),
       body.author?.trim() || null,
       body.level?.trim() || null,
-      word_count
+      lexile,
+      word_count,
+      status,
+      addedAt,
+      finishedAt
     )
     .first();
 

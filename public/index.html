@@ -45,6 +45,14 @@
       <h2>🥇 Leaderboard</h2>
       <div id="leaderboardList"></div>
     </section>
+
+    <section class="book-bars">
+      <div class="book-bars-header">
+        <h2>📊 Books Read</h2>
+        <select id="monthSelect"></select>
+      </div>
+      <div id="bookBarChart"></div>
+    </section>
   </main>
 
   <!-- Add book modal -->
@@ -55,10 +63,15 @@
       <label>Author (optional)<input type="text" name="author" placeholder="e.g. E.B. White" /></label>
       <label>About how many pages? (optional)<input type="number" name="pages" min="1" placeholder="e.g. 180" /></label>
       <label>Reading level (optional)<input type="text" name="level" id="levelInput" placeholder="e.g. 3rd grade" /></label>
+      <label>Lexile number (optional)<input type="number" name="lexile" id="lexileInput" placeholder="e.g. 760" /></label>
       <p class="lookup-status" id="lookupStatus" hidden></p>
+      <label>Date started<input type="date" name="started" id="startedInput" required /></label>
+      <label class="checkbox-row"><input type="checkbox" name="already_finished" id="alreadyFinishedCheckbox" /> Already finished this one</label>
+      <label id="finishedDateRow" hidden>Date finished<input type="date" name="finished" id="finishedInput" /></label>
+      <p class="lookup-status" id="alreadyFinishedHint" hidden>No quiz/points for this one — just logging it as read.</p>
       <div class="modal-actions">
         <button type="button" class="btn" id="cancelAddBook">Cancel</button>
-        <button type="submit" class="btn primary">Start Reading</button>
+        <button type="submit" class="btn primary" id="addBookSubmitBtn">Start Reading</button>
       </div>
     </form>
   </dialog>

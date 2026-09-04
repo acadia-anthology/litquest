@@ -212,9 +212,153 @@ main {
   flex: 1;
 }
 
+.card .dates {
+  font-size: 0.8rem;
+  color: #a79fc2;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.edit-dates-btn {
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 0.85rem;
+  padding: 0;
+  opacity: 0.6;
+}
+
+.edit-dates-btn:hover { opacity: 1; }
+
+.edit-dates-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: #f8f7ff;
+  border-radius: 10px;
+  padding: 10px;
+  margin-bottom: 10px;
+}
+
+.edit-dates-form label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.85rem;
+  gap: 8px;
+}
+
+.edit-dates-form input {
+  font-family: inherit;
+  padding: 4px 6px;
+  border-radius: 6px;
+  border: 1px solid #e6e1ff;
+}
+
+.edit-dates-form .row-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.edit-dates-form .row-actions button {
+  padding: 4px 10px;
+  font-size: 0.85rem;
+}
+
 .leaderboard-row .stats {
   font-size: 0.9rem;
   color: #8a8399;
+  text-align: right;
+}
+
+.book-bars {
+  margin-top: 40px;
+  margin-bottom: 20px;
+}
+
+.book-bars-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.book-bars h2 {
+  font-size: 1.1rem;
+  margin: 0;
+}
+
+#monthSelect {
+  font-family: 'Nunito', sans-serif;
+  font-weight: 700;
+  font-size: 0.9rem;
+  padding: 6px 10px;
+  border-radius: 10px;
+  border: 2px solid #e6e1ff;
+  background: white;
+  color: var(--purple);
+  cursor: pointer;
+}
+
+.bar-scale,
+.bar-row {
+  display: grid;
+  grid-template-columns: 100px 1fr 28px;
+  align-items: center;
+  gap: 10px;
+}
+
+.bar-scale {
+  margin-bottom: 6px;
+}
+
+.bar-scale-track {
+  position: relative;
+  height: 16px;
+}
+
+.bar-scale-track span {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  font-size: 0.75rem;
+  color: #a79fc2;
+}
+
+.bar-row {
+  margin-bottom: 10px;
+}
+
+.bar-row-label {
+  font-weight: 700;
+  font-size: 0.9rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bar-row-track {
+  background: #ece9ff;
+  border-radius: 999px;
+  height: 18px;
+  overflow: hidden;
+}
+
+.bar-row-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--purple), var(--pink));
+  width: 0%;
+  transition: width 0.4s ease;
+}
+
+.bar-row-count {
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--purple);
   text-align: right;
 }
 
@@ -271,6 +415,14 @@ dialog::backdrop {
   border-radius: 10px;
   border: 2px solid #e6e1ff;
 }
+
+.checkbox-row {
+  flex-direction: row !important;
+  align-items: center;
+  gap: 8px !important;
+}
+
+.checkbox-row input { width: auto; }
 
 .lookup-status {
   margin: -4px 0 0;

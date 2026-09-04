@@ -52,6 +52,8 @@ async function loadPlayers() {
   renderPlayerSwitcher();
   renderProfileBar();
   renderLeaderboard();
+  await loadMonthOptions();
+  await loadBookBars();
 
   const hasPlayer = Boolean(activePlayerId);
   newQuestBtn.hidden = !hasPlayer;
@@ -106,6 +108,62 @@ function renderLeaderboard() {
   });
 }
 
+const monthSelect = document.getElementById("monthSelect");
+const MONTH_ABBR = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
+
+function monthLabel(monthStr) {
+  const [year, month] = monthStr.split("-");
+  return `${MONTH_ABBR[Number(month) - 1]} ${year.slice(2)}`;
+}
+
+function currentMonthStr() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+}
+
+async function loadMonthOptions() {
+  const previouslySelected = monthSelect.value || currentMonthStr();
+  const months = await api("/api/stats/months");
+  monthSelect.innerHTML = months.map((m) => `<option value="${m}">${monthLabel(m)}</option>`).join("");
+  monthSelect.value = months.includes(previouslySelected) ? previouslySelected : months[0];
+}
+
+async function loadBookBars() {
+  const el = document.getElementById("bookBarChart");
+  if (!monthSelect.value) return;
+  const data = await api(`/api/stats/monthly-books?month=${monthSelect.value}`);
+  el.innerHTML = "";
+  if (data.length === 0) return;
+
+  const maxBooks = Math.max(0, ...data.map((p) => p.count));
+  const scaleMax = Math.max(3, maxBooks);
+  const step = Math.max(1, Math.ceil(scaleMax / 10));
+
+  const scale = document.createElement("div");
+  scale.className = "bar-scale";
+  let ticksHtml = "";
+  for (let t = step; t <= scaleMax; t += step) {
+    ticksHtml += `<span style="left:${(t / scaleMax) * 100}%">${t}</span>`;
+  }
+  scale.innerHTML = `<span></span><div class="bar-scale-track">${ticksHtml}</div><span></span>`;
+  el.appendChild(scale);
+
+  const ranked = [...data].sort((a, b) => b.count - a.count);
+  ranked.forEach((p) => {
+    const row = document.createElement("div");
+    row.className = "bar-row";
+    const widthPct = (p.count / scaleMax) * 100;
+    row.innerHTML = `
+      <span class="bar-row-label">${p.avatar} ${escapeHtml(p.name)}</span>
+      <div class="bar-row-track"><div class="bar-row-fill" style="width:${widthPct}%"></div></div>
+      <span class="bar-row-count">${p.count}</span>
+    `;
+    el.appendChild(row);
+  });
+}
+
+monthSelect.addEventListener("change", () => loadBookBars());
+
 document.getElementById("cancelAddPlayer").addEventListener("click", () => addPlayerModal.close());
 
 document.getElementById("addPlayerForm").addEventListener("submit", async (e) => {
@@ -123,16 +181,68 @@ document.getElementById("addPlayerForm").addEventListener("submit", async (e) =>
 
 // --- Books board ---
 
+function formatDate(dateStr) {
+  if (!dateStr) return null;
+  const d = new Date(dateStr.length === 10 ? `${dateStr}T00:00:00` : dateStr);
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+}
+
 function bookCard(book, actions) {
   const div = document.createElement("div");
   div.className = "card";
   const meta = [book.author, book.level].filter(Boolean).join(" · ");
+  const dateLabel = book.finished_at
+    ? `Started ${formatDate(book.added_at)} · Finished ${formatDate(book.finished_at)}`
+    : `Started ${formatDate(book.added_at)}`;
+
   div.innerHTML = `
     <h3>${escapeHtml(book.title)}</h3>
     <div class="meta">${escapeHtml(meta || " ")}</div>
+    <div class="dates">
+      <span class="date-label">${dateLabel}</span>
+      <button type="button" class="edit-dates-btn" title="Edit dates">✏️</button>
+    </div>
   `;
+
+  const editBtn = div.querySelector(".edit-dates-btn");
+  editBtn.addEventListener("click", () => toggleDateEditor(div, book));
+
   actions.forEach((a) => div.appendChild(a));
   return div;
+}
+
+function toggleDateEditor(cardEl, book) {
+  const existing = cardEl.querySelector(".edit-dates-form");
+  if (existing) {
+    existing.remove();
+    return;
+  }
+
+  const form = document.createElement("div");
+  form.className = "edit-dates-form";
+  form.innerHTML = `
+    <label>Started <input type="date" value="${book.added_at || ""}" class="edit-started" /></label>
+    <label>Finished <input type="date" value="${book.finished_at || ""}" class="edit-finished" /></label>
+    <div class="row-actions">
+      <button type="button" class="btn edit-cancel">Cancel</button>
+      <button type="button" class="btn primary edit-save">Save</button>
+    </div>
+  `;
+
+  form.querySelector(".edit-cancel").addEventListener("click", () => form.remove());
+  form.querySelector(".edit-save").addEventListener("click", async () => {
+    const started = form.querySelector(".edit-started").value;
+    const finished = form.querySelector(".edit-finished").value;
+    await api(`/api/books/${book.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ added_at: started, finished_at: finished || null }),
+    });
+    await loadBooks();
+    await loadMonthOptions();
+    await loadBookBars();
+  });
+
+  cardEl.querySelector(".dates").after(form);
 }
 
 function makeButton(label, onClick, primary = true) {
@@ -159,12 +269,12 @@ async function loadBooks() {
   if (completed.length === 0) completedCards.innerHTML = `<p class="empty-hint">Your finished quests will show up here.</p>`;
 
   reading.forEach((b) => {
-    const finishBtn = makeButton("Finished it! 🎉", () => startQuiz(b, true));
+    const finishBtn = makeButton("Finished it! 🎉", () => startQuiz(b));
     readingCards.appendChild(bookCard(b, [finishBtn]));
   });
 
   quizReady.forEach((b) => {
-    const quizBtn = makeButton("Take Quiz 📝", () => startQuiz(b, false));
+    const quizBtn = makeButton("Take Quiz 📝", () => startQuiz(b));
     quizReadyCards.appendChild(bookCard(b, [quizBtn]));
   });
 
@@ -179,13 +289,43 @@ const addBookForm = document.getElementById("addBookForm");
 const titleInput = addBookForm.querySelector('[name="title"]');
 const authorInput = addBookForm.querySelector('[name="author"]');
 const levelInput = document.getElementById("levelInput");
+const lexileInput = document.getElementById("lexileInput");
 const lookupStatus = document.getElementById("lookupStatus");
+const startedInput = document.getElementById("startedInput");
+const finishedInput = document.getElementById("finishedInput");
+const finishedDateRow = document.getElementById("finishedDateRow");
+const alreadyFinishedCheckbox = document.getElementById("alreadyFinishedCheckbox");
+const alreadyFinishedHint = document.getElementById("alreadyFinishedHint");
+const addBookSubmitBtn = document.getElementById("addBookSubmitBtn");
 
-newQuestBtn.addEventListener("click", () => addBookModal.showModal());
-document.getElementById("cancelAddBook").addEventListener("click", () => {
+function todayISO() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function resetAddBookForm() {
   addBookForm.reset();
+  startedInput.value = todayISO();
+  finishedInput.value = todayISO();
+  finishedDateRow.hidden = true;
+  alreadyFinishedHint.hidden = true;
+  addBookSubmitBtn.textContent = "Start Reading";
   lookupStatus.hidden = true;
   lookupToken++;
+}
+
+alreadyFinishedCheckbox.addEventListener("change", () => {
+  const checked = alreadyFinishedCheckbox.checked;
+  finishedDateRow.hidden = !checked;
+  alreadyFinishedHint.hidden = !checked;
+  addBookSubmitBtn.textContent = checked ? "Log as Finished" : "Start Reading";
+});
+
+newQuestBtn.addEventListener("click", () => {
+  resetAddBookForm();
+  addBookModal.showModal();
+});
+document.getElementById("cancelAddBook").addEventListener("click", () => {
+  resetAddBookForm();
   addBookModal.close();
 });
 
@@ -208,6 +348,8 @@ async function tryAutoLookupLevel() {
 
     if (result.known) {
       levelInput.value = `${result.grade_level} · Lexile ${result.lexile}`;
+      const lexileNum = parseInt(result.lexile, 10);
+      if (!lexileInput.value.trim() && Number.isFinite(lexileNum)) lexileInput.value = lexileNum;
       lookupStatus.textContent = `Found it: ${result.grade_level}, Lexile ${result.lexile}`;
     } else {
       lookupStatus.textContent = "Couldn't find a reading level for this one — enter it manually if you know it.";
@@ -232,20 +374,23 @@ addBookForm.addEventListener("submit", async (e) => {
     author: form.author.value,
     pages: form.pages.value,
     level: form.level.value,
+    lexile: lexileInput.value,
+    added_at: startedInput.value,
+    finished_at: alreadyFinishedCheckbox.checked ? finishedInput.value : null,
   };
   await api("/api/books", { method: "POST", body: JSON.stringify(payload) });
-  form.reset();
-  lookupStatus.hidden = true;
-  lookupToken++;
+  resetAddBookForm();
   addBookModal.close();
   await loadBooks();
+  await loadMonthOptions();
+  await loadBookBars();
 });
 
 // --- Quiz flow ---
 
 let currentQuiz = null;
 
-async function startQuiz(book, markFinished) {
+async function startQuiz(book) {
   document.getElementById("quizTitle").textContent = `Quiz: ${book.title}`;
   document.getElementById("quizLoading").hidden = false;
   document.getElementById("quizLoading").textContent = "Cooking up your questions... 🍳";
@@ -254,9 +399,8 @@ async function startQuiz(book, markFinished) {
   quizModal.showModal();
 
   try {
-    const quiz = markFinished
-      ? await api(`/api/books/${book.id}/quiz`, { method: "POST" })
-      : await api(`/api/books/${book.id}/quiz`);
+    // Always generates a fresh quiz — a retake gets new questions, not memorized old ones.
+    const quiz = await api(`/api/books/${book.id}/quiz`, { method: "POST" });
     currentQuiz = quiz;
     renderQuiz(quiz);
     await loadBooks();

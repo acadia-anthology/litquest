@@ -1,7 +1,26 @@
 // POST /api/quiz/:id/submit  { answers: [chosen_index, ...] }
-// Grades the quiz, awards points on a passing score (>=60%), updates the book's player.
+// Grades the quiz, awards points on a passing score (>=80%), updates the book's player.
 
-const PASS_THRESHOLD = 0.6;
+const PASS_THRESHOLD = 0.8;
+
+// Base points by book length (estimated word count).
+function lengthTierPoints(wordCount) {
+  if (wordCount < 10000) return 10;
+  if (wordCount < 40000) return 25;
+  if (wordCount < 80000) return 45;
+  return 70;
+}
+
+// Reward reading above grade level, scale back for books well below it.
+// Centered on a typical 6th-grade Lexile band (~800-1000L); no Lexile on file = neutral.
+function lexileMultiplier(lexile) {
+  if (lexile == null) return 1;
+  if (lexile < 500) return 0.5;
+  if (lexile < 800) return 0.75;
+  if (lexile < 1000) return 1;
+  if (lexile < 1200) return 1.5;
+  return 2;
+}
 
 export async function onRequestPost(context) {
   const { env, params, request } = context;
@@ -37,7 +56,7 @@ export async function onRequestPost(context) {
   const total = questions.length;
   const pct = score / total;
   const passed = pct >= PASS_THRESHOLD;
-  const basePoints = Math.max(1, Math.round(book.word_count / 1000));
+  const basePoints = Math.round(lengthTierPoints(book.word_count) * lexileMultiplier(book.lexile));
   const pointsEarned = passed ? Math.round(basePoints * pct) : 0;
 
   await env.DB.prepare(
@@ -47,10 +66,8 @@ export async function onRequestPost(context) {
     .run();
 
   if (passed) {
-    await env.DB.prepare(
-      "UPDATE books SET status = 'completed', finished_at = datetime('now') WHERE id = ?"
-    )
-      .bind(quiz.book_id)
+    await env.DB.prepare("UPDATE books SET status = 'completed', finished_at = ? WHERE id = ?")
+      .bind(new Date().toISOString().slice(0, 10), quiz.book_id)
       .run();
     await env.DB.prepare(
       "UPDATE players SET total_points = total_points + ?, books_completed = books_completed + 1 WHERE id = ?"

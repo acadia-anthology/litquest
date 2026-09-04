@@ -1,5 +1,5 @@
-// GET  /api/books/:id/quiz  -> return existing quiz (no answers), 404 if none generated yet
-// POST /api/books/:id/quiz  -> mark book finished, generate quiz via Groq if needed, return it
+// GET  /api/books/:id/quiz  -> return the latest quiz (no answers), 404 if none generated yet
+// POST /api/books/:id/quiz  -> generate a FRESH quiz via Groq (first attempt or a retake) and return it
 
 export async function onRequestGet(context) {
   const { env, params } = context;
@@ -18,30 +18,29 @@ export async function onRequestPost(context) {
   if (!book) {
     return Response.json({ error: "Book not found" }, { status: 404 });
   }
-
-  let quiz = await getLatestQuiz(env, params.id);
-
-  if (!quiz) {
-    if (!env.GROQ_API_KEY) {
-      return Response.json(
-        { error: "Server is missing GROQ_API_KEY, so quizzes can't be generated." },
-        { status: 500 }
-      );
-    }
-    let questions;
-    try {
-      questions = await generateQuiz(env.GROQ_API_KEY, book);
-    } catch (err) {
-      return Response.json({ error: `Couldn't generate a quiz: ${err.message}` }, { status: 502 });
-    }
-    quiz = await env.DB.prepare(
-      "INSERT INTO quizzes (book_id, questions_json) VALUES (?, ?) RETURNING *"
-    )
-      .bind(params.id, JSON.stringify(questions))
-      .first();
+  if (!env.GROQ_API_KEY) {
+    return Response.json(
+      { error: "Server is missing GROQ_API_KEY, so quizzes can't be generated." },
+      { status: 500 }
+    );
   }
 
-  await env.DB.prepare("UPDATE books SET status = 'quiz_ready' WHERE id = ? AND status = 'reading'")
+  let questions;
+  try {
+    questions = await generateQuiz(env.GROQ_API_KEY, book);
+  } catch (err) {
+    return Response.json({ error: `Couldn't generate a quiz: ${err.message}` }, { status: 502 });
+  }
+
+  // Every call generates a new quiz — a retake after a fail gets fresh questions,
+  // not the same ones memorized through trial and error.
+  const quiz = await env.DB.prepare(
+    "INSERT INTO quizzes (book_id, questions_json) VALUES (?, ?) RETURNING *"
+  )
+    .bind(params.id, JSON.stringify(questions))
+    .first();
+
+  await env.DB.prepare("UPDATE books SET status = 'quiz_ready' WHERE id = ? AND status != 'completed'")
     .bind(params.id)
     .run();
 
