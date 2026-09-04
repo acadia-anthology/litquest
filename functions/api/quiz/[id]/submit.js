@@ -66,7 +66,11 @@ export async function onRequestPost(context) {
     .run();
 
   if (passed) {
-    await env.DB.prepare("UPDATE books SET status = 'completed', finished_at = ? WHERE id = ?")
+    // Backdated backlog books already have a real finished_at on file — keep it
+    // instead of overwriting with today (the date the optional quiz happened to be taken).
+    await env.DB.prepare(
+      "UPDATE books SET status = 'completed', finished_at = COALESCE(finished_at, ?) WHERE id = ?"
+    )
       .bind(new Date().toISOString().slice(0, 10), quiz.book_id)
       .run();
     await env.DB.prepare(

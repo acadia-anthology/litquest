@@ -39,9 +39,10 @@ export async function onRequestPost(context) {
 
   const addedAt = DATE_RE.test(body.added_at) ? body.added_at : todayDate();
 
-  // Logging an already-read book (no quiz/points — just a record for the backlog).
+  // Logging an already-read backlog book: goes straight to Quiz Ready with its real
+  // finish date on file — the quiz there is optional, just for bonus points.
   const alreadyFinished = DATE_RE.test(body.finished_at);
-  const status = alreadyFinished ? "completed" : "reading";
+  const status = alreadyFinished ? "quiz_ready" : "reading";
   const finishedAt = alreadyFinished ? body.finished_at : null;
 
   const book = await env.DB.prepare(
