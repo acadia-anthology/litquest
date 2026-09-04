@@ -1,8 +1,12 @@
-// PATCH /api/players/:id  { reader_type?, name?, avatar? }  -> change a player's
+// PATCH  /api/players/:id  { reader_type?, name?, avatar? }  -> change a player's
 // Kid/Adult reader type, rename the profile, and/or change its avatar emoji. At
 // least one field is required.
+// DELETE /api/players/:id  { pin }  -> permanently remove a player and everything
+// they logged (books, quizzes, quiz history, quest rewards). PIN-gated.
 
 import { withLevel } from "../../../_lib/level.js";
+
+const EDIT_PIN = "2112";
 
 export async function onRequestPatch(context) {
   const { env, params, request } = context;
@@ -41,4 +45,35 @@ export async function onRequestPatch(context) {
     .first();
 
   return Response.json(withLevel(player));
+}
+
+export async function onRequestDelete(context) {
+  const { env, params, request } = context;
+  const body = await request.json().catch(() => null);
+
+  if (body?.pin !== EDIT_PIN) {
+    return Response.json({ error: "Incorrect PIN" }, { status: 403 });
+  }
+
+  const existing = await env.DB.prepare("SELECT id FROM players WHERE id = ?").bind(params.id).first();
+  if (!existing) {
+    return Response.json({ error: "Player not found" }, { status: 404 });
+  }
+
+  await env.DB.prepare(
+    "DELETE FROM quiz_attempts WHERE book_id IN (SELECT id FROM books WHERE player_id = ?)"
+  )
+    .bind(params.id)
+    .run();
+  await env.DB.prepare(
+    "DELETE FROM quizzes WHERE book_id IN (SELECT id FROM books WHERE player_id = ?)"
+  )
+    .bind(params.id)
+    .run();
+  await env.DB.prepare("DELETE FROM books WHERE player_id = ?").bind(params.id).run();
+  await env.DB.prepare("DELETE FROM quest_reward_claims WHERE player_id = ?").bind(params.id).run();
+  await env.DB.prepare("DELETE FROM quest_rewards WHERE player_id = ?").bind(params.id).run();
+  await env.DB.prepare("DELETE FROM players WHERE id = ?").bind(params.id).run();
+
+  return Response.json({ deleted: true });
 }

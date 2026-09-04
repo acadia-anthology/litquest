@@ -196,6 +196,25 @@ main {
   color: white;
 }
 
+.btn.danger {
+  background: #ffe3ea;
+  color: #d63566;
+}
+
+.btn.danger:hover {
+  background: #d63566;
+  color: white;
+}
+
+.delete-confirm {
+  border-top: 2px solid #ece9ff;
+  margin-top: 4px;
+  padding-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
 .btn.big {
   display: block;
   margin: 0 auto 28px;

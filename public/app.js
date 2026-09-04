@@ -362,12 +362,22 @@ document.getElementById("addPlayerForm").addEventListener("submit", async (e) =>
 
 const renamePlayerModal = document.getElementById("renamePlayerModal");
 const renamePlayerForm = document.getElementById("renamePlayerForm");
+const deleteProfileConfirm = document.getElementById("deleteProfileConfirm");
+const deleteProfilePin = document.getElementById("deleteProfilePin");
+const deleteProfileError = document.getElementById("deleteProfileError");
 let renamingPlayerId = null;
+
+function resetDeleteProfileConfirm() {
+  deleteProfileConfirm.hidden = true;
+  deleteProfilePin.value = "";
+  deleteProfileError.hidden = true;
+}
 
 function openRenamePlayer(p) {
   renamingPlayerId = p.id;
   renamePlayerForm.name.value = p.name;
   renamePlayerForm.avatar.value = p.avatar;
+  resetDeleteProfileConfirm();
   renamePlayerModal.showModal();
 }
 
@@ -380,6 +390,30 @@ renamePlayerForm.addEventListener("submit", async (e) => {
     body: JSON.stringify({ name: renamePlayerForm.name.value, avatar: renamePlayerForm.avatar.value }),
   });
   renamePlayerModal.close();
+  await loadPlayers();
+});
+
+document.getElementById("deleteProfileBtn").addEventListener("click", () => {
+  deleteProfileConfirm.hidden = false;
+  deleteProfilePin.focus();
+});
+
+document.getElementById("cancelDeleteProfile").addEventListener("click", () => resetDeleteProfileConfirm());
+
+document.getElementById("confirmDeleteProfile").addEventListener("click", async () => {
+  deleteProfileError.hidden = true;
+  try {
+    await api(`/api/players/${renamingPlayerId}`, {
+      method: "DELETE",
+      body: JSON.stringify({ pin: deleteProfilePin.value }),
+    });
+  } catch (err) {
+    deleteProfileError.textContent = err.message;
+    deleteProfileError.hidden = false;
+    return;
+  }
+  renamePlayerModal.close();
+  resetDeleteProfileConfirm();
   await loadPlayers();
 });
 

@@ -176,8 +176,18 @@
       <label>Name<input type="text" name="name" required /></label>
       <label>Avatar emoji<input type="text" name="avatar" maxlength="4" required /></label>
       <div class="modal-actions">
+        <button type="button" class="btn danger" id="deleteProfileBtn">🗑️ Delete</button>
         <button type="button" class="btn" id="cancelRenamePlayer">Cancel</button>
         <button type="submit" class="btn primary">Save</button>
+      </div>
+      <div id="deleteProfileConfirm" class="delete-confirm" hidden>
+        <p class="error-text">This permanently deletes this profile and everything it logged. Enter the PIN to confirm.</p>
+        <div class="pin-gate">
+          <input type="password" id="deleteProfilePin" inputmode="numeric" maxlength="8" placeholder="••••" />
+          <button type="button" class="btn" id="cancelDeleteProfile">Cancel</button>
+          <button type="button" class="btn danger" id="confirmDeleteProfile">Confirm Delete</button>
+        </div>
+        <p id="deleteProfileError" class="error-text" hidden>Incorrect PIN.</p>
       </div>
     </form>
   </dialog>
