@@ -42,3 +42,37 @@ CREATE TABLE IF NOT EXISTS quiz_attempts (
   answers_json TEXT, -- chosen choice index per question, for reviewing missed questions
   completed_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+-- Two shared quest tracks (Side Quest = short cycle, Main Quest = long cycle).
+-- Kid profiles only. Progress is points earned within the current cycle, which
+-- rolls forward automatically from anchor_date every period_months.
+CREATE TABLE IF NOT EXISTS quests (
+  quest_type TEXT PRIMARY KEY, -- 'side' | 'main'
+  period_months INTEGER NOT NULL,
+  anchor_date TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS quest_rewards (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  quest_type TEXT NOT NULL, -- 'side' | 'main'
+  threshold INTEGER NOT NULL, -- points needed within the current cycle
+  emoji TEXT NOT NULL,
+  reward_text TEXT NOT NULL,
+  UNIQUE(quest_type, threshold)
+);
+
+-- One row per (player, quest, cycle, reward) the very first time it's crossed —
+-- drives the kid's one-time celebration popup and the parent's "mark delivered"
+-- notice. A new cycle has a different cycle_start, so the same reward can be
+-- earned again next cycle.
+CREATE TABLE IF NOT EXISTS quest_reward_claims (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  player_id INTEGER NOT NULL REFERENCES players(id),
+  quest_type TEXT NOT NULL,
+  cycle_start TEXT NOT NULL,
+  reward_id INTEGER NOT NULL REFERENCES quest_rewards(id),
+  reached_at TEXT NOT NULL DEFAULT (datetime('now')),
+  delivered_at TEXT,
+  seen_at TEXT, -- when the kid's celebration popup was actually shown
+  UNIQUE(player_id, quest_type, cycle_start, reward_id)
+);

@@ -45,6 +45,7 @@ function setActivePlayer(id) {
   renderPlayerSwitcher();
   renderProfileBar();
   loadBooks();
+  loadRewardsWidget();
 }
 
 async function loadPlayers() {
@@ -58,6 +59,7 @@ async function loadPlayers() {
   renderLeaderboard();
   await loadMonthOptions();
   await loadBookBars();
+  await loadRewardsWidget();
 
   const hasPlayer = Boolean(activePlayerId);
   newQuestBtn.hidden = !hasPlayer;
@@ -89,6 +91,129 @@ function renderProfileBar() {
   document.getElementById("pointsText").textContent = `${p.total_points} pts`;
   document.getElementById("xpFill").style.width = `${p.points_into_level}%`;
   document.getElementById("readerTypeSelect").value = p.reader_type;
+}
+
+// --- Quest rewards ---
+
+async function loadRewardsWidget() {
+  const widget = document.getElementById("rewardsWidget");
+  const p = activePlayer();
+
+  if (!p || p.reader_type !== "kid") {
+    widget.hidden = true;
+  } else {
+    let data;
+    try {
+      data = await api(`/api/quests/progress?player_id=${p.id}`);
+    } catch {
+      data = null;
+    }
+
+    const anyConfigured = data?.tracks.some((t) => t.configured && t.rewards.length > 0);
+    widget.hidden = !anyConfigured;
+    if (anyConfigured) data.tracks.forEach(renderQuestBar);
+
+    for (const claim of data?.newly_reached ?? []) {
+      await showCelebration(claim);
+    }
+  }
+
+  await loadGoalNotices();
+}
+
+function renderQuestBar(track) {
+  const blockEl = document.getElementById(`${track.quest_type}-bar-block`);
+  if (!track.configured || track.rewards.length === 0) {
+    blockEl.hidden = true;
+    return;
+  }
+  blockEl.hidden = false;
+
+  const barEl = document.getElementById(`${track.quest_type}-progress-bar`);
+  const nextEl = document.getElementById(`${track.quest_type}-next`);
+
+  const maxThreshold = Math.max(...track.rewards.map((r) => r.threshold));
+  const scaleMax = Math.max(maxThreshold, track.points);
+  const fillPct = Math.min(100, (track.points / scaleMax) * 100);
+
+  const marks = track.rewards
+    .map((r) => {
+      const pct = (r.threshold / scaleMax) * 100;
+      return `<span class="quest-mark${r.reached ? " reached" : ""}" style="left:${pct}%" title="${r.threshold} pts: ${escapeHtml(r.reward_text)}">${r.emoji}</span>`;
+    })
+    .join("");
+
+  barEl.innerHTML = `
+    <div class="quest-progress-track">
+      <div class="quest-progress-fill" style="width:${fillPct}%"></div>
+      ${marks}
+    </div>
+  `;
+
+  const next = track.rewards.find((r) => !r.reached);
+  nextEl.textContent = next
+    ? `${track.points}/${next.threshold} pts to ${next.emoji} ${next.reward_text}`
+    : `🎉 All rewards unlocked this cycle! (${track.points} pts)`;
+}
+
+async function showCelebration(claim) {
+  const content = document.getElementById("celebrationContent");
+  content.innerHTML = `
+    <div class="celebration-emoji">${claim.emoji}</div>
+    <h2>You earned it!</h2>
+    <p>${escapeHtml(claim.reward_text)}</p>
+    <div class="modal-actions">
+      <button class="btn primary" id="closeCelebration">Yay!</button>
+    </div>
+  `;
+  const modal = document.getElementById("celebrationModal");
+  modal.showModal();
+  await new Promise((resolve) => {
+    document.getElementById("closeCelebration").addEventListener("click", () => {
+      modal.close();
+      resolve();
+    });
+  });
+  await api(`/api/quests/claims/${claim.claim_id}`, {
+    method: "PATCH",
+    body: JSON.stringify({ action: "seen" }),
+  });
+}
+
+async function loadGoalNotices() {
+  const el = document.getElementById("goalNotices");
+  const p = activePlayer();
+  if (!p || p.reader_type !== "adult") {
+    el.innerHTML = "";
+    return;
+  }
+
+  const pending = await api("/api/quests/pending");
+  if (pending.length === 0) {
+    el.innerHTML = "";
+    return;
+  }
+
+  el.innerHTML = pending
+    .map(
+      (c) => `
+    <div class="goal-notice">
+      <span>${c.player_avatar} ${escapeHtml(c.player_name)} reached a goal — ${c.emoji} ${escapeHtml(c.reward_text)}!</span>
+      <button type="button" class="mark-delivered-btn" data-id="${c.id}">Mark Delivered</button>
+    </div>
+  `
+    )
+    .join("");
+
+  el.querySelectorAll(".mark-delivered-btn").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      await api(`/api/quests/claims/${btn.dataset.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ action: "deliver" }),
+      });
+      await loadGoalNotices();
+    });
+  });
 }
 
 document.getElementById("readerTypeSelect").addEventListener("change", async (e) => {

@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Litquest Rewards</title>
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Nunito:wght@400;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <a href="/" class="brand" style="text-decoration:none">📚 <span>Litquest</span></a>
+    <div class="topbar-right">
+      <a href="/" class="btn">← Back to Litquest</a>
+    </div>
+  </header>
+
+  <main>
+    <h1 class="rewards-title">⭐ Quest Rewards</h1>
+    <p class="rewards-subtitle">Kid profiles only. Editing needs the PIN.</p>
+
+    <div id="lockedNotice" class="pin-gate">
+      <label>Enter PIN to edit<input type="password" id="pinInput" inputmode="numeric" maxlength="8" placeholder="••••" /></label>
+      <button type="button" class="btn primary" id="unlockBtn">Unlock</button>
+      <p id="pinError" class="error-text" hidden>Incorrect PIN.</p>
+    </div>
+
+    <section class="quest-track" id="track-side">
+      <h2>🏃 Side Quest <span class="quest-cycle-label" id="side-cycle-label"></span></h2>
+      <div class="quest-period-row" id="side-period-row"></div>
+      <div class="rewards-list" id="side-rewards-list"></div>
+      <form class="quest-add-form" id="side-add-form" hidden>
+        <input type="number" name="threshold" min="1" required placeholder="Points" />
+        <input type="text" name="emoji" maxlength="4" required placeholder="🍦" />
+        <input type="text" name="reward_text" required placeholder="Reward" />
+        <button type="submit" class="btn primary">Add</button>
+      </form>
+    </section>
+
+    <section class="quest-track" id="track-main">
+      <h2>🏆 Main Quest <span class="quest-cycle-label" id="main-cycle-label"></span></h2>
+      <div class="quest-period-row" id="main-period-row"></div>
+      <div class="rewards-list" id="main-rewards-list"></div>
+      <form class="quest-add-form" id="main-add-form" hidden>
+        <input type="number" name="threshold" min="1" required placeholder="Points" />
+        <input type="text" name="emoji" maxlength="4" required placeholder="🎡" />
+        <input type="text" name="reward_text" required placeholder="Reward" />
+        <button type="submit" class="btn primary">Add</button>
+      </form>
+    </section>
+  </main>
+
+  <script src="/rewards.js"></script>
+</body>
+</html>
