@@ -82,7 +82,10 @@ export async function onRequestPost(context) {
 
   // Books identified as Kindergarten-3rd grade can't be logged for points at all —
   // enforced server-side so it can't be bypassed even if a client bug lets it through.
-  const gradeNum = Number(body.grade_level_num);
+  // Adult books legitimately have no grade level (sent as "" from the client), and
+  // Number("") is 0, not NaN — so that has to be excluded explicitly or every adult
+  // book with no grade level gets wrongly treated as Kindergarten and blocked.
+  const gradeNum = body.grade_level_num === "" || body.grade_level_num == null ? NaN : Number(body.grade_level_num);
   if (Number.isFinite(gradeNum) && gradeNum < 4) {
     return Response.json(
       { error: "This book is below our 4th-grade-and-up floor and can't be logged." },
