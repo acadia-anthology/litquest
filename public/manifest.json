@@ -1,0 +1,12 @@
+{
+  "name": "Litquest",
+  "short_name": "Litquest",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f4f2ff",
+  "theme_color": "#7c5cff",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}

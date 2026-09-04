@@ -1,0 +1,14 @@
+{
+  "name": "litquest",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "dev": "wrangler pages dev public",
+    "deploy": "wrangler pages deploy public",
+    "db:init:local": "wrangler d1 execute litquest-db --local --file=db/schema.sql",
+    "db:init:remote": "wrangler d1 execute litquest-db --remote --file=db/schema.sql"
+  },
+  "devDependencies": {
+    "wrangler": "^4.129.0"
+  }
+}

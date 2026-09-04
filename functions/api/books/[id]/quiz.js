@@ -1,0 +1,113 @@
+// GET  /api/books/:id/quiz  -> return existing quiz (no answers), 404 if none generated yet
+// POST /api/books/:id/quiz  -> mark book finished, generate quiz via Groq if needed, return it
+
+export async function onRequestGet(context) {
+  const { env, params } = context;
+  const quiz = await getLatestQuiz(env, params.id);
+  if (!quiz) {
+    return Response.json({ error: "No quiz generated yet" }, { status: 404 });
+  }
+  return Response.json(toClientQuiz(quiz));
+}
+
+export async function onRequestPost(context) {
+  const { env, params } = context;
+  const book = await env.DB.prepare("SELECT * FROM books WHERE id = ?")
+    .bind(params.id)
+    .first();
+  if (!book) {
+    return Response.json({ error: "Book not found" }, { status: 404 });
+  }
+
+  let quiz = await getLatestQuiz(env, params.id);
+
+  if (!quiz) {
+    if (!env.GROQ_API_KEY) {
+      return Response.json(
+        { error: "Server is missing GROQ_API_KEY, so quizzes can't be generated." },
+        { status: 500 }
+      );
+    }
+    let questions;
+    try {
+      questions = await generateQuiz(env.GROQ_API_KEY, book);
+    } catch (err) {
+      return Response.json({ error: `Couldn't generate a quiz: ${err.message}` }, { status: 502 });
+    }
+    quiz = await env.DB.prepare(
+      "INSERT INTO quizzes (book_id, questions_json) VALUES (?, ?) RETURNING *"
+    )
+      .bind(params.id, JSON.stringify(questions))
+      .first();
+  }
+
+  await env.DB.prepare("UPDATE books SET status = 'quiz_ready' WHERE id = ? AND status = 'reading'")
+    .bind(params.id)
+    .run();
+
+  return Response.json(toClientQuiz(quiz));
+}
+
+async function getLatestQuiz(env, bookId) {
+  return env.DB.prepare(
+    "SELECT * FROM quizzes WHERE book_id = ? ORDER BY created_at DESC LIMIT 1"
+  )
+    .bind(bookId)
+    .first();
+}
+
+// Strip correct_index before sending to the browser so answers can't be inspected client-side.
+function toClientQuiz(quiz) {
+  const questions = JSON.parse(quiz.questions_json).map((q, i) => ({
+    index: i,
+    question: q.question,
+    choices: q.choices,
+  }));
+  return { quiz_id: quiz.id, questions };
+}
+
+async function generateQuiz(apiKey, book) {
+  const prompt = `Create 5 multiple-choice reading comprehension questions for a child who just finished reading the book "${book.title}"${
+    book.author ? ` by ${book.author}` : ""
+  }${book.level ? ` (reading level: ${book.level})` : ""}.
+
+Base the questions on the well-known plot, characters, and themes of this book. Test understanding of what happened in the story, not obscure trivia. Keep the language simple and age-appropriate for the reading level given.
+
+Respond with ONLY valid JSON, no markdown fences, no other text, in exactly this shape:
+[
+  {"question": "...", "choices": ["...", "...", "...", "..."], "correct_index": 0},
+  {"question": "...", "choices": ["...", "...", "...", "..."], "correct_index": 0},
+  {"question": "...", "choices": ["...", "...", "...", "..."], "correct_index": 0},
+  {"question": "...", "choices": ["...", "...", "...", "..."], "correct_index": 0},
+  {"question": "...", "choices": ["...", "...", "...", "..."], "correct_index": 0}
+]`;
+
+  const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: "llama-3.3-70b-versatile",
+      max_tokens: 1500,
+      messages: [{ role: "user", content: prompt }],
+    }),
+  });
+
+  if (!res.ok) {
+    throw new Error(`Groq API returned ${res.status}: ${await res.text()}`);
+  }
+
+  const data = await res.json();
+  const text = (data.choices?.[0]?.message?.content ?? "")
+    .trim()
+    .replace(/^```(json)?\s*/i, "")
+    .replace(/```\s*$/i, "");
+
+  const questions = JSON.parse(text);
+  if (!Array.isArray(questions) || questions.length === 0) {
+    throw new Error("Model did not return a question list");
+  }
+  return questions;
+}

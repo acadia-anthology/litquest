@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Litquest</title>
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Nunito:wght@400;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">📚 <span>Litquest</span></div>
+    <div class="profile-bar" id="profileBar">
+      <span class="level-badge" id="levelBadge">Lv 1</span>
+      <div class="xp-track"><div class="xp-fill" id="xpFill"></div></div>
+      <span class="points" id="pointsText">0 pts</span>
+    </div>
+  </header>
+
+  <main>
+    <button class="btn primary big" id="newQuestBtn">✨ New Quest (Add a Book)</button>
+
+    <section class="board" id="board">
+      <div class="column">
+        <h2>📖 Reading</h2>
+        <div class="cards" id="readingCards"></div>
+      </div>
+      <div class="column">
+        <h2>❓ Quiz Ready</h2>
+        <div class="cards" id="quizReadyCards"></div>
+      </div>
+      <div class="column">
+        <h2>🏆 Completed</h2>
+        <div class="cards" id="completedCards"></div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Add book modal -->
+  <dialog id="addBookModal">
+    <form id="addBookForm" class="modal-form">
+      <h2>✨ Start a New Quest</h2>
+      <label>Book Title<input type="text" name="title" required placeholder="e.g. Charlotte's Web" /></label>
+      <label>Author (optional)<input type="text" name="author" placeholder="e.g. E.B. White" /></label>
+      <label>About how many pages? (optional)<input type="number" name="pages" min="1" placeholder="e.g. 180" /></label>
+      <label>Reading level (optional)<input type="text" name="level" placeholder="e.g. 3rd grade" /></label>
+      <div class="modal-actions">
+        <button type="button" class="btn" id="cancelAddBook">Cancel</button>
+        <button type="submit" class="btn primary">Start Reading</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Quiz modal -->
+  <dialog id="quizModal">
+    <div class="modal-form">
+      <h2 id="quizTitle">Quiz Time!</h2>
+      <p id="quizLoading">Cooking up your questions... 🍳</p>
+      <form id="quizForm" hidden></form>
+      <div class="modal-actions">
+        <button type="button" class="btn" id="cancelQuiz">Close</button>
+        <button type="submit" form="quizForm" class="btn primary" id="submitQuizBtn" hidden>Submit Quiz</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Results modal -->
+  <dialog id="resultModal">
+    <div class="modal-form" id="resultContent"></div>
+  </dialog>
+
+  <script src="/app.js"></script>
+</body>
+</html>
