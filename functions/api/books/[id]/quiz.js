@@ -89,7 +89,7 @@ Respond with ONLY valid JSON, no markdown fences, no other text, in exactly this
       authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
-      model: "llama-3.3-70b-versatile",
+      model: "openai/gpt-oss-120b",
       max_tokens: 1500,
       messages: [{ role: "user", content: prompt }],
     }),
@@ -109,5 +109,20 @@ Respond with ONLY valid JSON, no markdown fences, no other text, in exactly this
   if (!Array.isArray(questions) || questions.length === 0) {
     throw new Error("Model did not return a question list");
   }
-  return questions;
+  // The model tends to always place the correct choice first — shuffle so the
+  // answer position isn't guessable.
+  return questions.map(shuffleChoices);
+}
+
+function shuffleChoices(q) {
+  const order = q.choices.map((_, i) => i);
+  for (let i = order.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [order[i], order[j]] = [order[j], order[i]];
+  }
+  return {
+    question: q.question,
+    choices: order.map((i) => q.choices[i]),
+    correct_index: order.indexOf(q.correct_index),
+  };
 }
