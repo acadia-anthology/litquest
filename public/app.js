@@ -203,15 +203,19 @@ function bookRow(book, actionBtn) {
     book.points_earned > 0 ? `<span class="points-badge">+${book.points_earned} pts</span>` : "";
 
   div.innerHTML = `
-    ${pointsBadge}
-    <div class="title-block">
-      <h3>${escapeHtml(book.title)}</h3>
-      <div class="meta">${escapeHtml(meta || " ")}</div>
+    <div class="row-main">
+      ${pointsBadge}
+      <div class="title-block">
+        <h3>${escapeHtml(book.title)}</h3>
+        <div class="meta">${escapeHtml(meta || " ")}</div>
+      </div>
     </div>
-    <div class="dates">
-      <span class="date-label">${dateLabel}</span>
-      <button type="button" class="edit-dates-btn" title="Edit dates">✏️</button>
-      <button type="button" class="delete-book-btn" title="Delete this book">🗑️</button>
+    <div class="row-side">
+      <div class="dates">
+        <span class="date-label">${dateLabel}</span>
+        <button type="button" class="edit-dates-btn" title="Edit dates">✏️</button>
+        <button type="button" class="delete-book-btn" title="Delete this book">🗑️</button>
+      </div>
     </div>
   `;
 
@@ -220,7 +224,7 @@ function bookRow(book, actionBtn) {
 
   if (actionBtn) {
     actionBtn.classList.add("action-btn");
-    div.appendChild(actionBtn);
+    div.querySelector(".row-side").appendChild(actionBtn);
   }
   return div;
 }
@@ -268,7 +272,7 @@ function toggleDateEditor(cardEl, book) {
     await loadBookBars();
   });
 
-  cardEl.querySelector(".dates").after(form);
+  cardEl.appendChild(form);
 }
 
 function makeButton(label, onClick, primary = true) {

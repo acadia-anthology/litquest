@@ -406,6 +406,12 @@ main {
   box-shadow: 0 4px 14px rgba(43,36,64,0.06);
 }
 
+.book-row .row-main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .book-row .title-block h3 {
   margin: 0 0 2px;
   font-size: 1rem;
@@ -414,6 +420,14 @@ main {
 .book-row .meta {
   font-size: 0.85rem;
   color: #8a8399;
+}
+
+.book-row .row-side {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .book-row .dates {
@@ -438,7 +452,6 @@ main {
   padding: 5px 12px;
   border-radius: 999px;
   white-space: nowrap;
-  order: -1;
 }
 
 .empty-hint {
