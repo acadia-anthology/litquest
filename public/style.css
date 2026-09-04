@@ -930,8 +930,19 @@ dialog::backdrop {
   margin-bottom: 20px;
 }
 
+.rewards-widget-card {
+  background: var(--card);
+  border-radius: 18px;
+  padding: 18px 20px;
+  box-shadow: 0 4px 14px rgba(43,36,64,0.06);
+}
+
 .quest-bar-block {
   margin-bottom: 20px;
+}
+
+.quest-bar-block:last-child {
+  margin-bottom: 0;
 }
 
 .quest-bar-label {

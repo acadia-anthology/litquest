@@ -83,7 +83,8 @@ function renderPlayerSwitcher() {
   });
   const addBtn = document.createElement("button");
   addBtn.className = "player-pill add-player";
-  addBtn.textContent = "+ Add Player";
+  addBtn.textContent = "+";
+  addBtn.title = "Add Player";
   addBtn.addEventListener("click", () => addPlayerModal.showModal());
   el.appendChild(addBtn);
 }
