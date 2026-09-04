@@ -205,14 +205,27 @@ function bookCard(book, actions) {
     <div class="dates">
       <span class="date-label">${dateLabel}</span>
       <button type="button" class="edit-dates-btn" title="Edit dates">✏️</button>
+      <button type="button" class="delete-book-btn" title="Delete this book">🗑️</button>
     </div>
   `;
 
-  const editBtn = div.querySelector(".edit-dates-btn");
-  editBtn.addEventListener("click", () => toggleDateEditor(div, book));
+  div.querySelector(".edit-dates-btn").addEventListener("click", () => toggleDateEditor(div, book));
+  div.querySelector(".delete-book-btn").addEventListener("click", () => deleteBook(book));
 
   actions.forEach((a) => div.appendChild(a));
   return div;
+}
+
+async function deleteBook(book) {
+  const warning =
+    book.status === "completed"
+      ? `Delete "${book.title}"? This also removes any points it earned.`
+      : `Delete "${book.title}"?`;
+  if (!confirm(warning)) return;
+
+  await api(`/api/books/${book.id}`, { method: "DELETE" });
+  await loadBooks();
+  await loadPlayers();
 }
 
 function toggleDateEditor(cardEl, book) {
@@ -249,6 +262,32 @@ function toggleDateEditor(cardEl, book) {
   cardEl.querySelector(".dates").after(form);
 }
 
+function completedRow(book) {
+  const div = document.createElement("div");
+  div.className = "completed-row";
+  const meta = [book.author, book.level].filter(Boolean).join(" · ");
+  const dateLabel = book.finished_at
+    ? `Started ${formatDate(book.added_at)} · Finished ${formatDate(book.finished_at)}`
+    : `Started ${formatDate(book.added_at)}`;
+
+  div.innerHTML = `
+    <div class="title-block">
+      <h3>${escapeHtml(book.title)}</h3>
+      <div class="meta">${escapeHtml(meta || " ")}</div>
+    </div>
+    <div class="dates">
+      <span class="date-label">${dateLabel}</span>
+      <button type="button" class="edit-dates-btn" title="Edit dates">✏️</button>
+      <button type="button" class="delete-book-btn" title="Delete this book">🗑️</button>
+    </div>
+  `;
+
+  div.querySelector(".edit-dates-btn").addEventListener("click", () => toggleDateEditor(div, book));
+  div.querySelector(".delete-book-btn").addEventListener("click", () => deleteBook(book));
+
+  return div;
+}
+
 function makeButton(label, onClick, primary = true) {
   const btn = document.createElement("button");
   btn.className = `btn${primary ? " primary" : ""}`;
@@ -283,7 +322,7 @@ async function loadBooks() {
   });
 
   completed.forEach((b) => {
-    completedCards.appendChild(bookCard(b, []));
+    completedCards.appendChild(completedRow(b));
   });
 }
 

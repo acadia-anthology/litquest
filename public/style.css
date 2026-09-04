@@ -179,7 +179,7 @@ main {
 
 .board {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 20px;
 }
 
@@ -190,6 +190,14 @@ main {
 .column h2 {
   font-size: 1.1rem;
   margin-bottom: 10px;
+}
+
+.section-badge {
+  display: inline-block;
+  background: #ece9ff;
+  color: var(--purple);
+  padding: 6px 16px;
+  border-radius: 999px;
 }
 
 .cards {
@@ -262,6 +270,17 @@ main {
 
 .edit-dates-btn:hover { opacity: 1; }
 
+.delete-book-btn {
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 0.85rem;
+  padding: 0;
+  opacity: 0.5;
+}
+
+.delete-book-btn:hover { opacity: 1; }
+
 .edit-dates-form {
   display: flex;
   flex-direction: column;
@@ -270,6 +289,11 @@ main {
   border-radius: 10px;
   padding: 10px;
   margin-bottom: 10px;
+}
+
+.completed-row .edit-dates-form {
+  flex-basis: 100%;
+  margin-bottom: 0;
 }
 
 .edit-dates-form label {
@@ -390,6 +414,54 @@ main {
   font-size: 0.9rem;
   color: var(--purple);
   text-align: right;
+}
+
+.completed-section {
+  margin-top: 40px;
+  margin-bottom: 20px;
+}
+
+.completed-section h2 {
+  font-size: 1.1rem;
+  margin-bottom: 14px;
+}
+
+.completed-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.completed-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  background: var(--card);
+  border-radius: 14px;
+  padding: 14px 18px;
+  box-shadow: 0 4px 14px rgba(43,36,64,0.06);
+}
+
+.completed-row .title-block h3 {
+  margin: 0 0 2px;
+  font-size: 1rem;
+}
+
+.completed-row .meta {
+  font-size: 0.85rem;
+  color: #8a8399;
+}
+
+.completed-row .dates {
+  margin: 0;
+  font-size: 0.8rem;
+  color: #a79fc2;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
 }
 
 .card h3 {

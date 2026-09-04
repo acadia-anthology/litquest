@@ -31,16 +31,12 @@
 
     <section class="board" id="board">
       <div class="column">
-        <h2>📖 Reading</h2>
+        <h2><span class="section-badge">📖 Reading</span></h2>
         <div class="cards" id="readingCards"></div>
       </div>
       <div class="column">
-        <h2>❓ Quiz Ready</h2>
+        <h2><span class="section-badge">❓ Quiz Ready</span></h2>
         <div class="cards" id="quizReadyCards"></div>
-      </div>
-      <div class="column">
-        <h2>🏆 Completed</h2>
-        <div class="cards" id="completedCards"></div>
       </div>
     </section>
 
@@ -55,6 +51,11 @@
         <select id="monthSelect"></select>
       </div>
       <div id="bookBarChart"></div>
+    </section>
+
+    <section class="completed-section">
+      <h2>🏆 Completed</h2>
+      <div class="completed-rows" id="completedCards"></div>
     </section>
   </main>
 
