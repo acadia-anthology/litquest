@@ -109,9 +109,9 @@ async function loadRewardsWidget() {
       data = null;
     }
 
-    const anyConfigured = data?.tracks.some((t) => t.configured && t.rewards.length > 0);
+    const anyConfigured = data?.tracks.some((t) => t.rewards.length > 0);
     widget.hidden = !anyConfigured;
-    if (anyConfigured) data.tracks.forEach(renderQuestBar);
+    if (anyConfigured) data.tracks.forEach((t) => renderQuestBar(t, data.total_points));
 
     for (const claim of data?.newly_reached ?? []) {
       await showCelebration(claim);
@@ -121,9 +121,16 @@ async function loadRewardsWidget() {
   await loadGoalNotices();
 }
 
-function renderQuestBar(track) {
+// A reward's "position" on the bar: a one-time reward sits at its fixed
+// threshold; a repeating reward sits at its next not-yet-claimed milestone,
+// since once claimed it effectively becomes a fresh goal further out.
+function rewardPosition(r) {
+  return r.reward_type === "repeat" ? r.next_milestone : r.threshold;
+}
+
+function renderQuestBar(track, totalPoints) {
   const blockEl = document.getElementById(`${track.quest_type}-bar-block`);
-  if (!track.configured || track.rewards.length === 0) {
+  if (track.rewards.length === 0) {
     blockEl.hidden = true;
     return;
   }
@@ -132,15 +139,20 @@ function renderQuestBar(track) {
   const barEl = document.getElementById(`${track.quest_type}-progress-bar`);
   const nextEl = document.getElementById(`${track.quest_type}-next`);
 
-  const maxThreshold = Math.max(...track.rewards.map((r) => r.threshold));
-  const scaleMax = Math.max(maxThreshold, track.points);
-  const fillPct = Math.min(100, (track.points / scaleMax) * 100);
+  const maxPosition = Math.max(...track.rewards.map(rewardPosition));
+  const scaleMax = Math.max(maxPosition, totalPoints, 1);
+  const fillPct = Math.min(100, (totalPoints / scaleMax) * 100);
 
   const marks = track.rewards
     .map((r) => {
-      const pct = (r.threshold / scaleMax) * 100;
-      const tooltip = `${r.threshold} pts: ${r.emoji} ${r.reward_text}`;
-      return `<span class="quest-mark${r.reached ? " reached" : ""}" style="left:${pct}%" title="${escapeHtml(tooltip)}" data-tooltip="${escapeHtml(tooltip)}">${r.emoji}</span>`;
+      const pos = rewardPosition(r);
+      const pct = (pos / scaleMax) * 100;
+      const reached = r.reward_type === "once" && r.reached;
+      const tooltip =
+        r.reward_type === "repeat"
+          ? `Every ${r.threshold} pts: ${r.emoji} ${r.reward_text}${r.times_claimed ? ` (earned ${r.times_claimed}×)` : ""}`
+          : `${r.threshold} pts: ${r.emoji} ${r.reward_text}`;
+      return `<span class="quest-mark${reached ? " reached" : ""}" style="left:${pct}%" title="${escapeHtml(tooltip)}" data-tooltip="${escapeHtml(tooltip)}">${r.emoji}</span>`;
     })
     .join("");
 
@@ -158,10 +170,11 @@ function renderQuestBar(track) {
     });
   });
 
-  const next = track.rewards.find((r) => !r.reached);
+  const upcoming = track.rewards.filter((r) => r.reward_type === "repeat" || !r.reached);
+  const next = upcoming.sort((a, b) => rewardPosition(a) - rewardPosition(b))[0];
   nextEl.textContent = next
-    ? `${track.points}/${next.threshold} pts to ${next.emoji} ${next.reward_text}`
-    : `🎉 All rewards unlocked this cycle! (${track.points} pts)`;
+    ? `${totalPoints}/${rewardPosition(next)} pts to ${next.emoji} ${next.reward_text}`
+    : `🎉 All rewards unlocked! (${totalPoints} pts)`;
 }
 
 function toggleQuestTooltip(markEl) {
@@ -207,7 +220,6 @@ async function loadGoalNotices() {
   const p = activePlayer();
   if (!p || p.reader_type !== "adult") {
     el.innerHTML = "";
-    document.getElementById("deliveredHistory").hidden = true;
     return;
   }
 
@@ -234,33 +246,6 @@ async function loadGoalNotices() {
       await loadGoalNotices();
     });
   });
-
-  await loadDeliveredHistory();
-}
-
-async function loadDeliveredHistory() {
-  const el = document.getElementById("deliveredHistory");
-  const history = await api("/api/quests/delivered");
-  if (history.length === 0) {
-    el.hidden = true;
-    return;
-  }
-  el.hidden = false;
-  el.innerHTML = `
-    <h3 class="delivered-history-title">📬 Reward History</h3>
-    <div class="delivered-history-list">
-      ${history
-        .map(
-          (c) => `
-        <div class="delivered-history-row">
-          <span>${c.player_avatar} ${escapeHtml(c.player_name)} got ${c.emoji} ${escapeHtml(c.reward_text)}</span>
-          <span class="delivered-history-date">${formatDate(c.delivered_at)}</span>
-        </div>
-      `
-        )
-        .join("")}
-    </div>
-  `;
 }
 
 document.getElementById("readerTypeSelect").addEventListener("change", async (e) => {

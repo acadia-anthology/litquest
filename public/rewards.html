@@ -36,10 +36,13 @@
     </div>
 
     <section class="quest-track" id="track-side">
-      <h2>🏃 Side Quest <span class="quest-cycle-label" id="side-cycle-label"></span></h2>
-      <div class="quest-period-row" id="side-period-row"></div>
+      <h2>🏃 Side Quest</h2>
       <div class="rewards-list" id="side-rewards-list"></div>
       <form class="quest-add-form" id="side-add-form" hidden>
+        <select name="reward_type" class="mode-select">
+          <option value="once">Once at</option>
+          <option value="repeat">Every</option>
+        </select>
         <input type="number" name="threshold" min="1" required placeholder="Points" />
         <select name="unit" class="unit-select">
           <option value="points">pts</option>
@@ -52,10 +55,13 @@
     </section>
 
     <section class="quest-track" id="track-main">
-      <h2>🏆 Main Quest <span class="quest-cycle-label" id="main-cycle-label"></span></h2>
-      <div class="quest-period-row" id="main-period-row"></div>
+      <h2>🏆 Main Quest</h2>
       <div class="rewards-list" id="main-rewards-list"></div>
       <form class="quest-add-form" id="main-add-form" hidden>
+        <select name="reward_type" class="mode-select">
+          <option value="once">Once at</option>
+          <option value="repeat">Every</option>
+        </select>
         <input type="number" name="threshold" min="1" required placeholder="Points" />
         <select name="unit" class="unit-select">
           <option value="points">pts</option>
@@ -65,6 +71,11 @@
         <input type="text" name="reward_text" required placeholder="Reward" />
         <button type="submit" class="btn primary">Add</button>
       </form>
+    </section>
+
+    <section class="archived-section" id="archivedSection" hidden>
+      <h2 class="archived-title">📦 Archived</h2>
+      <div class="archived-list" id="archivedList"></div>
     </section>
   </main>
 

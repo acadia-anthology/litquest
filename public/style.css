@@ -828,36 +828,6 @@ dialog::backdrop {
   margin-bottom: 4px;
 }
 
-.quest-cycle-label {
-  font-size: 0.85rem;
-  font-weight: 400;
-  color: #8a8399;
-}
-
-.quest-period-row {
-  display: flex;
-  align-items: flex-end;
-  gap: 10px;
-  margin-bottom: 14px;
-}
-
-.quest-period-row label {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  font-weight: 600;
-  font-size: 0.85rem;
-}
-
-.quest-period-row input {
-  font-family: inherit;
-  font-size: 1rem;
-  padding: 8px 10px;
-  border-radius: 10px;
-  border: 2px solid #e6e1ff;
-  width: 100px;
-}
-
 .quest-add-form {
   display: flex;
   gap: 8px;
@@ -865,17 +835,20 @@ dialog::backdrop {
   flex-wrap: wrap;
 }
 
-.quest-add-form input {
+.quest-add-form input,
+.quest-add-form select {
   font-family: inherit;
   font-size: 0.9rem;
   padding: 8px 10px;
   border-radius: 10px;
   border: 2px solid #e6e1ff;
+  background: white;
 }
 
 .quest-add-form input[name="threshold"] { width: 90px; }
 .quest-add-form input[name="emoji"] { width: 60px; }
 .quest-add-form input[name="reward_text"] { flex: 1; min-width: 140px; }
+.quest-add-form .mode-select { width: 100px; }
 
 .pin-gate {
   display: flex;
@@ -1061,14 +1034,17 @@ dialog::backdrop {
   margin: -4px 0 10px;
 }
 
-.edit-reward-form input {
+.edit-reward-form input,
+.edit-reward-form select {
   font-family: inherit;
   font-size: 0.9rem;
   padding: 6px 8px;
   border-radius: 8px;
   border: 1px solid #e6e1ff;
+  background: white;
 }
 
+.edit-reward-form .edit-mode { width: 90px; }
 .edit-reward-form .edit-threshold { width: 80px; }
 .edit-reward-form .edit-emoji { width: 50px; }
 .edit-reward-form .edit-text { flex: 1; min-width: 140px; }
@@ -1091,36 +1067,42 @@ dialog::backdrop {
   border: 2px solid #e6e1ff;
 }
 
-.delivered-history {
-  background: var(--card);
-  border-radius: 14px;
-  padding: 14px 18px;
-  margin-bottom: 16px;
-  box-shadow: 0 4px 14px rgba(43,36,64,0.06);
+.archived-section {
+  margin-top: 20px;
+  max-width: 560px;
 }
 
-.delivered-history-title {
-  font-size: 0.95rem;
-  margin: 0 0 8px;
+.archived-title {
+  font-size: 1.05rem;
+  color: #8a8399;
+  margin-bottom: 10px;
 }
 
-.delivered-history-list {
+.archived-list {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
 }
 
-.delivered-history-row {
+.archived-row {
   display: flex;
-  justify-content: space-between;
   align-items: center;
   gap: 10px;
+  padding: 6px 10px;
   font-size: 0.85rem;
-  flex-wrap: wrap;
+  color: #8a8399;
+  border-bottom: 1px solid #ece9ff;
 }
 
-.delivered-history-date {
-  color: #a79fc2;
+.archived-emoji {
+  font-size: 1rem;
+}
+
+.archived-text {
+  flex: 1;
+}
+
+.archived-date {
   white-space: nowrap;
 }
 

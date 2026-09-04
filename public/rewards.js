@@ -14,6 +14,19 @@ function escapeHtml(str) {
   return d.innerHTML;
 }
 
+function formatDate(dateStr) {
+  if (!dateStr) return "";
+  return new Date(dateStr.replace(" ", "T") + "Z").toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function rewardLabel(r) {
+  return r.reward_type === "repeat" ? `Every ${r.threshold} pts` : `${r.threshold} pts`;
+}
+
 let unlocked = false;
 let pin = null;
 let kids = [];
@@ -30,6 +43,7 @@ async function loadKids() {
     kidPicker.disabled = true;
     document.getElementById("track-side").hidden = true;
     document.getElementById("track-main").hidden = true;
+    document.getElementById("archivedSection").hidden = true;
     return;
   }
 
@@ -40,13 +54,13 @@ async function loadKids() {
   kidPicker.value = String(activeKidId);
   kidPicker.disabled = false;
 
-  await loadQuests();
+  await Promise.all([loadQuests(), loadArchive()]);
 }
 
 kidPicker.addEventListener("change", async () => {
   activeKidId = Number(kidPicker.value);
   localStorage.setItem("litquest_rewards_kid", String(activeKidId));
-  await loadQuests();
+  await Promise.all([loadQuests(), loadArchive()]);
 });
 
 async function loadQuests() {
@@ -56,33 +70,8 @@ async function loadQuests() {
 
 function renderTrack(track) {
   const { quest_type } = track;
-  const cycleLabel = document.getElementById(`${quest_type}-cycle-label`);
-  const periodRow = document.getElementById(`${quest_type}-period-row`);
   const list = document.getElementById(`${quest_type}-rewards-list`);
   const addForm = document.getElementById(`${quest_type}-add-form`);
-
-  cycleLabel.textContent = track.period_months
-    ? `— every ${track.period_months} month${track.period_months === 1 ? "" : "s"} (current cycle: ${track.start} to ${track.end})`
-    : "— not set up yet";
-
-  periodRow.innerHTML = `
-    <label>Cycle length (months)
-      <input type="number" min="1" class="period-input" value="${track.period_months ?? ""}" ${unlocked ? "" : "disabled"} />
-    </label>
-    <button type="button" class="btn primary save-period-btn" ${unlocked ? "" : "hidden"}>Save</button>
-  `;
-  periodRow.querySelector(".save-period-btn")?.addEventListener("click", async () => {
-    const months = periodRow.querySelector(".period-input").value;
-    try {
-      await api("/api/quests", {
-        method: "POST",
-        body: JSON.stringify({ player_id: activeKidId, quest_type, period_months: months, pin }),
-      });
-      await loadQuests();
-    } catch (err) {
-      alert(err.message);
-    }
-  });
 
   if (track.rewards.length === 0) {
     list.innerHTML = `<p class="empty-hint">No rewards set for this track yet.</p>`;
@@ -91,7 +80,7 @@ function renderTrack(track) {
       .map(
         (r) => `
       <div class="reward-row" data-id="${r.id}">
-        <span class="reward-level">${r.threshold} pts</span>
+        <span class="reward-level">${escapeHtml(rewardLabel(r))}</span>
         <span class="reward-emoji">${r.emoji}</span>
         <span class="reward-text">${escapeHtml(r.reward_text)}</span>
         <span class="reward-actions">
@@ -126,6 +115,10 @@ function toggleEditReward(rowEl, reward) {
   const form = document.createElement("div");
   form.className = "edit-reward-form";
   form.innerHTML = `
+    <select class="edit-mode">
+      <option value="once" ${reward.reward_type === "once" ? "selected" : ""}>Once at</option>
+      <option value="repeat" ${reward.reward_type === "repeat" ? "selected" : ""}>Every</option>
+    </select>
     <input type="number" min="1" class="edit-threshold" value="${reward.threshold}" />
     <input type="text" maxlength="4" class="edit-emoji" value="${escapeHtml(reward.emoji)}" />
     <input type="text" class="edit-text" value="${escapeHtml(reward.reward_text)}" />
@@ -141,6 +134,7 @@ function toggleEditReward(rowEl, reward) {
         method: "PATCH",
         body: JSON.stringify({
           threshold: form.querySelector(".edit-threshold").value,
+          reward_type: form.querySelector(".edit-mode").value,
           emoji: form.querySelector(".edit-emoji").value,
           reward_text: form.querySelector(".edit-text").value,
           pin,
@@ -176,6 +170,7 @@ async function deleteReward(id) {
         body: JSON.stringify({
           player_id: activeKidId,
           quest_type: questType,
+          reward_type: form.reward_type.value,
           threshold,
           emoji: form.emoji.value,
           reward_text: form.reward_text.value,
@@ -189,6 +184,28 @@ async function deleteReward(id) {
     }
   });
 });
+
+async function loadArchive() {
+  const section = document.getElementById("archivedSection");
+  const list = document.getElementById("archivedList");
+  const history = await api(`/api/quests/archive?player_id=${activeKidId}`);
+  if (history.length === 0) {
+    section.hidden = true;
+    return;
+  }
+  section.hidden = false;
+  list.innerHTML = history
+    .map(
+      (c) => `
+    <div class="archived-row">
+      <span class="archived-emoji">${c.emoji}</span>
+      <span class="archived-text">${escapeHtml(c.reward_text)}</span>
+      <span class="archived-date">${formatDate(c.delivered_at)}</span>
+    </div>
+  `
+    )
+    .join("");
+}
 
 document.getElementById("unlockBtn").addEventListener("click", () => {
   const entered = document.getElementById("pinInput").value;

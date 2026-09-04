@@ -43,40 +43,33 @@ CREATE TABLE IF NOT EXISTS quiz_attempts (
   completed_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
--- Two quest tracks per kid (Side Quest = short cycle, Main Quest = long cycle),
--- individually configurable so each kid profile can have its own rewards.
--- Progress is points earned within the current cycle, which rolls forward
--- automatically from anchor_date every period_months.
-CREATE TABLE IF NOT EXISTS quests (
-  player_id INTEGER NOT NULL REFERENCES players(id),
-  quest_type TEXT NOT NULL, -- 'side' | 'main'
-  period_months INTEGER NOT NULL,
-  anchor_date TEXT NOT NULL,
-  PRIMARY KEY (player_id, quest_type)
-);
-
+-- Two quest tracks per kid (Side Quest / Main Quest, just a grouping label —
+-- no cycles: points never reset, so thresholds are against all-time total_points).
+-- 'once' rewards fire a single time at an exact point value; 'repeat' rewards
+-- fire again every time total_points crosses another multiple of threshold.
 CREATE TABLE IF NOT EXISTS quest_rewards (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   player_id INTEGER NOT NULL REFERENCES players(id),
   quest_type TEXT NOT NULL, -- 'side' | 'main'
-  threshold INTEGER NOT NULL, -- points needed within the current cycle
+  reward_type TEXT NOT NULL DEFAULT 'once', -- 'once' | 'repeat'
+  threshold INTEGER NOT NULL, -- 'once': the exact point value; 'repeat': the interval size
   emoji TEXT NOT NULL,
   reward_text TEXT NOT NULL,
-  UNIQUE(player_id, quest_type, threshold)
+  UNIQUE(player_id, quest_type, reward_type, threshold)
 );
 
--- One row per (player, quest, cycle, reward) the very first time it's crossed —
--- drives the kid's one-time celebration popup and the parent's "mark delivered"
--- notice. A new cycle has a different cycle_start, so the same reward can be
--- earned again next cycle.
+-- One row per (player, reward, milestone) the first time it's crossed — drives
+-- the kid's one-time celebration popup and the parent's "mark delivered" notice.
+-- milestone_points is the threshold itself for 'once' rewards, or the specific
+-- multiple crossed (e.g. 500, 1000, 1500...) for 'repeat' rewards, so a repeat
+-- reward naturally gets a new claimable row each time it fires again.
 CREATE TABLE IF NOT EXISTS quest_reward_claims (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   player_id INTEGER NOT NULL REFERENCES players(id),
-  quest_type TEXT NOT NULL,
-  cycle_start TEXT NOT NULL,
   reward_id INTEGER NOT NULL REFERENCES quest_rewards(id),
+  milestone_points INTEGER NOT NULL,
   reached_at TEXT NOT NULL DEFAULT (datetime('now')),
   delivered_at TEXT,
   seen_at TEXT, -- when the kid's celebration popup was actually shown
-  UNIQUE(player_id, quest_type, cycle_start, reward_id)
+  UNIQUE(player_id, reward_id, milestone_points)
 );

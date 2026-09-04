@@ -1,5 +1,5 @@
-// PATCH  /api/quests/rewards/:id  { threshold?, emoji?, reward_text?, pin }  -> edit one tier in place
-// DELETE /api/quests/rewards/:id  { pin }                                    -> remove one reward tier
+// PATCH  /api/quests/rewards/:id  { threshold?, reward_type?, emoji?, reward_text?, pin }  -> edit one tier in place
+// DELETE /api/quests/rewards/:id  { pin }                                                  -> remove one reward tier
 
 const EDIT_PIN = "2112";
 
@@ -23,6 +23,10 @@ export async function onRequestPatch(context) {
       return Response.json({ error: "threshold must be a positive whole number" }, { status: 400 });
     }
   }
+  let rewardType = existing.reward_type;
+  if (body.reward_type !== undefined) {
+    rewardType = body.reward_type === "repeat" ? "repeat" : "once";
+  }
   const emoji = body.emoji !== undefined ? body.emoji.trim() : existing.emoji;
   if (!emoji) {
     return Response.json({ error: "emoji is required" }, { status: 400 });
@@ -35,9 +39,9 @@ export async function onRequestPatch(context) {
   let reward;
   try {
     reward = await env.DB.prepare(
-      `UPDATE quest_rewards SET threshold = ?, emoji = ?, reward_text = ? WHERE id = ? RETURNING *`
+      `UPDATE quest_rewards SET threshold = ?, reward_type = ?, emoji = ?, reward_text = ? WHERE id = ? RETURNING *`
     )
-      .bind(threshold, emoji, rewardText, params.id)
+      .bind(threshold, rewardType, emoji, rewardText, params.id)
       .first();
   } catch {
     return Response.json({ error: "Another reward on this track already uses that point value" }, { status: 409 });
