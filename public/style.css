@@ -556,13 +556,16 @@ dialog::backdrop {
   margin-bottom: 8px;
 }
 
-.choice {
+.modal-form label.choice {
   display: flex;
+  flex-direction: row;
   align-items: center;
   gap: 8px;
   padding: 8px 10px;
   border-radius: 10px;
   cursor: pointer;
+  text-align: left;
+  font-weight: 400;
 }
 
 .choice:hover { background: #f4f2ff; }
