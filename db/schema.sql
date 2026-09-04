@@ -39,5 +39,6 @@ CREATE TABLE IF NOT EXISTS quiz_attempts (
   score INTEGER NOT NULL,
   total INTEGER NOT NULL,
   points_earned INTEGER NOT NULL,
+  answers_json TEXT, -- chosen choice index per question, for reviewing missed questions
   completed_at TEXT NOT NULL DEFAULT (datetime('now'))
 );

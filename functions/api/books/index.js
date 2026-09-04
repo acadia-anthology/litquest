@@ -8,6 +8,12 @@ function todayDate() {
   return new Date().toISOString().slice(0, 10);
 }
 
+// Loose match so "Harry Potter and the Sorcerer's Stone" and "...Sorcerers Stone"
+// (apostrophe/case/spacing differences) are still caught as the same book.
+function normTitle(s) {
+  return s.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
 export async function onRequestGet(context) {
   const { env, request } = context;
   const playerId = new URL(request.url).searchParams.get("player_id");
@@ -35,6 +41,19 @@ export async function onRequestPost(context) {
   }
   if (!body.player_id) {
     return Response.json({ error: "player_id is required" }, { status: 400 });
+  }
+
+  // One entry per book per profile — check before anything else so a duplicate
+  // doesn't burn a lookup/quiz-generation call for nothing.
+  const existing = await env.DB.prepare("SELECT title FROM books WHERE player_id = ?")
+    .bind(body.player_id)
+    .all();
+  const newTitleNorm = normTitle(body.title.trim());
+  if (existing.results.some((b) => normTitle(b.title) === newTitleNorm)) {
+    return Response.json(
+      { error: "This book is already logged on this profile." },
+      { status: 409 }
+    );
   }
 
   // Books identified as Kindergarten-3rd grade can't be logged for points at all —

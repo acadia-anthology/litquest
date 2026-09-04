@@ -457,6 +457,18 @@ main {
 .book-row .quiz-score-label {
   font-weight: 700;
   color: var(--purple);
+  background: none;
+  border: none;
+  padding: 0;
+  font-family: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.book-row .quiz-score-label:hover {
+  color: var(--pink);
 }
 
 .book-row .action-btn {
@@ -634,4 +646,37 @@ dialog::backdrop {
 
 .help-bar-fill.alt {
   background: linear-gradient(90deg, var(--orange), var(--pink));
+}
+
+#quizReviewContent {
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.review-question {
+  margin-bottom: 18px;
+}
+
+.review-question-text {
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.review-choice {
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  color: #8a8399;
+}
+
+.review-choice.review-correct {
+  background: #e6f9ef;
+  color: var(--green);
+  font-weight: 700;
+}
+
+.review-choice.review-wrong {
+  background: #ffe9f0;
+  color: var(--pink);
+  font-weight: 700;
 }

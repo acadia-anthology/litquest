@@ -221,7 +221,7 @@ function bookRow(book, actionBtn) {
 
   const quizScoreLine =
     book.status === "completed" && Number.isFinite(book.quiz_score) && Number.isFinite(book.quiz_total)
-      ? `<span class="quiz-score-label">Quiz: ${book.quiz_score}/${book.quiz_total}</span>`
+      ? `<button type="button" class="quiz-score-label" title="See quiz questions">Quiz: ${book.quiz_score}/${book.quiz_total}</button>`
       : "";
 
   div.innerHTML = `
@@ -244,6 +244,7 @@ function bookRow(book, actionBtn) {
 
   div.querySelector(".edit-dates-btn").addEventListener("click", () => toggleDateEditor(div, book));
   div.querySelector(".delete-book-btn").addEventListener("click", () => deleteBook(book));
+  div.querySelector(".quiz-score-label")?.addEventListener("click", () => showQuizReview(book));
 
   if (actionBtn) {
     actionBtn.classList.add("action-btn");
@@ -306,9 +307,12 @@ function makeButton(label, onClick, primary = true) {
   return btn;
 }
 
+let currentBooks = [];
+
 async function loadBooks() {
   if (!activePlayerId) return;
   const books = await api(`/api/books?player_id=${activePlayerId}`);
+  currentBooks = books;
   readingCards.innerHTML = "";
   quizReadyCards.innerHTML = "";
   completedCards.innerHTML = "";
@@ -397,14 +401,27 @@ function invalidateLookup() {
 titleInput.addEventListener("input", invalidateLookup);
 authorInput.addEventListener("input", invalidateLookup);
 
+function normTitle(s) {
+  return s.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
 async function tryAutoLookupLevel() {
   const title = titleInput.value.trim();
   if (!title) return;
 
   const myToken = ++lookupToken;
   lookupStatus.hidden = false;
-  lookupStatus.textContent = "🔍 Looking up this book...";
   addBookSubmitBtn.disabled = false;
+
+  const titleNorm = normTitle(title);
+  if (currentBooks.some((b) => normTitle(b.title) === titleNorm)) {
+    lastLookupResult = null;
+    addBookSubmitBtn.disabled = true;
+    lookupStatus.textContent = "📚 This book is already logged on this profile.";
+    return;
+  }
+
+  lookupStatus.textContent = "🔍 Looking up this book...";
 
   try {
     const result = await api("/api/lookup-level", {
@@ -420,9 +437,8 @@ async function tryAutoLookupLevel() {
     } else if (result.known) {
       lastLookupResult = result;
       const parts = [];
-      if (result.grade_level) parts.push(result.grade_level);
-      if (result.lit_score) parts.push(`LitScore ${result.lit_score}`);
       if (result.book_type) parts.push(result.book_type);
+      if (result.lit_score) parts.push(`LitScore ${result.lit_score}`);
       if (result.pages) parts.push(`~${result.pages} pages`);
       lookupStatus.textContent =
         parts.length > 0 ? `📖 Found it: ${parts.join(" · ")}` : "Found the book, but couldn't estimate its details.";
@@ -446,7 +462,7 @@ addBookForm.addEventListener("submit", async (e) => {
   e.preventDefault();
   const form = e.target;
   const levelParts = [];
-  if (lastLookupResult?.grade_level) levelParts.push(lastLookupResult.grade_level);
+  if (lastLookupResult?.book_type) levelParts.push(lastLookupResult.book_type);
   if (lastLookupResult?.lit_score) levelParts.push(`LitScore ${lastLookupResult.lit_score}`);
 
   const payload = {
@@ -462,7 +478,13 @@ addBookForm.addEventListener("submit", async (e) => {
     added_at: startedInput.value,
     finished_at: alreadyFinishedCheckbox.checked ? finishedInput.value : null,
   };
-  await api("/api/books", { method: "POST", body: JSON.stringify(payload) });
+  try {
+    await api("/api/books", { method: "POST", body: JSON.stringify(payload) });
+  } catch (err) {
+    lookupStatus.hidden = false;
+    lookupStatus.textContent = `⚠️ ${err.message}`;
+    return;
+  }
   resetAddBookForm();
   addBookModal.close();
   await loadBooks();
@@ -552,6 +574,53 @@ function showResult(result) {
   `;
   resultModal.showModal();
   document.getElementById("closeResult").addEventListener("click", () => resultModal.close());
+}
+
+// --- Quiz review ---
+
+const quizReviewModal = document.getElementById("quizReviewModal");
+document.getElementById("closeQuizReview").addEventListener("click", () => quizReviewModal.close());
+
+async function showQuizReview(book) {
+  document.getElementById("quizReviewTitle").textContent = `Quiz Review: ${book.title}`;
+  const content = document.getElementById("quizReviewContent");
+  content.innerHTML = "<p>Loading...</p>";
+  quizReviewModal.showModal();
+
+  let data;
+  try {
+    data = await api(`/api/books/${book.id}/quiz-review`);
+  } catch (err) {
+    content.innerHTML = `<p>Couldn't load the quiz review: ${escapeHtml(err.message)}</p>`;
+    return;
+  }
+
+  if (!data.questions) {
+    content.innerHTML = `<p class="big-score" style="text-align:center">${data.score} / ${data.total}</p><p>This quiz was taken before per-question review was added, so the individual answers aren't on file.</p>`;
+    return;
+  }
+
+  content.innerHTML = data.questions
+    .map((q, i) => {
+      const choicesHtml = q.choices
+        .map((choice, ci) => {
+          const isCorrect = ci === q.correct_index;
+          const isChosen = ci === q.chosen_index;
+          let cls = "review-choice";
+          if (isCorrect) cls += " review-correct";
+          if (isChosen && !isCorrect) cls += " review-wrong";
+          const marker = isCorrect ? "✅" : isChosen ? "❌" : "";
+          return `<div class="${cls}">${marker} ${escapeHtml(choice)}</div>`;
+        })
+        .join("");
+      return `
+        <div class="review-question">
+          <p class="review-question-text">${i + 1}. ${escapeHtml(q.question)} ${q.correct ? "✅" : "❌"}</p>
+          ${choicesHtml}
+        </div>
+      `;
+    })
+    .join("");
 }
 
 // --- init ---

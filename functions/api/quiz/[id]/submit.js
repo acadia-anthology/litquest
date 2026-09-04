@@ -82,9 +82,9 @@ export async function onRequestPost(context) {
   const pointsEarned = passed ? Math.round(basePoints * pct) : 0;
 
   await env.DB.prepare(
-    "INSERT INTO quiz_attempts (quiz_id, book_id, player_id, score, total, points_earned) VALUES (?, ?, ?, ?, ?, ?)"
+    "INSERT INTO quiz_attempts (quiz_id, book_id, player_id, score, total, points_earned, answers_json) VALUES (?, ?, ?, ?, ?, ?, ?)"
   )
-    .bind(params.id, quiz.book_id, book.player_id, score, total, pointsEarned)
+    .bind(params.id, quiz.book_id, book.player_id, score, total, pointsEarned, JSON.stringify(answers))
     .run();
 
   if (passed) {
