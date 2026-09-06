@@ -109,7 +109,7 @@ async function correctTypos(apiKey, title, author) {
     author ? `, author "${author}"` : ""
   }.
 
-If — and only if — you recognize this as a real, specific, well-known book despite a typo, respond with the corrected spelling. If you don't clearly recognize it, or you're just guessing, return the title/author completely unchanged rather than inventing a "fix" for something you don't actually know.
+Fix ONLY clear misspellings — wrong, missing, swapped, or extra letters within a word (e.g. "Whimpy" -> "Wimpy", "Kinny" -> "Kinney"). Do NOT do anything else to the title: don't shorten it, don't drop a series name/prefix, don't remove a number or subtitle the child included, don't rephrase or "canonicalize" it to however it's officially catalogued — if a word is spelled correctly, leave it and everything around it exactly as typed, even if you'd normally format the title differently. If — and only if — you're genuinely confident you recognize the specific book despite a typo, fix just the misspelled word(s). If you don't clearly recognize it, or you're only guessing, return the title/author completely unchanged.
 
 Respond with ONLY this JSON, no other text, no markdown fences:
 {"title": "corrected or unchanged title"${author ? ', "author": "corrected or unchanged author"' : ""}}`;
