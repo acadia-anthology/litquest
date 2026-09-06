@@ -1,5 +1,13 @@
 // POST /api/lookup-level  { title, author }
 //
+// Kids type titles/authors fast and get spellings wrong ("Diary of a Whimpy
+// Kid", "Jeff Kinny") — a single wrong letter can make an otherwise-findable
+// book return zero results from every external source. So the very first step
+// is asking Groq to correct obvious typos in a title/author it confidently
+// recognizes (never inventing a "correction" for something it doesn't actually
+// know), and every lookup below — plus the final saved book record — uses that
+// corrected spelling.
+//
 // Confirms the book is real via Open Library (free, keyless, indexes new releases
 // almost immediately) and gets a real page count AND real genre/subject tags from
 // there in one call — Open Library's search embeds subject tags directly, no
@@ -21,15 +29,20 @@ import { findGoodreadsBook } from "../_lib/goodreads.js";
 export async function onRequestPost(context) {
   const { env, request } = context;
   const body = await request.json().catch(() => null);
-  const title = body?.title?.trim();
-  if (!title) {
+  const rawTitle = body?.title?.trim();
+  if (!rawTitle) {
     return Response.json({ error: "title is required" }, { status: 400 });
   }
-  const author = body?.author?.trim();
+  const rawAuthor = body?.author?.trim();
 
   if (!env.GROQ_API_KEY) {
     return Response.json({ error: "Server is missing GROQ_API_KEY" }, { status: 500 });
   }
+
+  const corrected = await correctTypos(env.GROQ_API_KEY, rawTitle, rawAuthor).catch(() => null);
+  const title = corrected?.title || rawTitle;
+  const author = corrected?.author ?? rawAuthor;
+  const wasCorrected = title !== rawTitle || author !== rawAuthor;
 
   const ol = await findOpenLibraryBook(title, author).catch(() => null);
   let book = ol && { title: ol.title, author: ol.author, year: ol.year, pages: ol.pages };
@@ -53,7 +66,8 @@ export async function onRequestPost(context) {
   }
 
   if (!book) {
-    return Response.json(toApiShape(await aiFullGuess(env.GROQ_API_KEY, title, author)));
+    const guess = await aiFullGuess(env.GROQ_API_KEY, title, author);
+    return Response.json(toApiShape(guess, wasCorrected ? { title, author } : null));
   }
 
   if (!genreHint) {
@@ -63,21 +77,50 @@ export async function onRequestPost(context) {
   const levelGuess = await estimateLevel(env.GROQ_API_KEY, book, genreHint).catch(() => null);
 
   return Response.json(
-    toApiShape({
-      known: true,
-      ...levelGuess,
-      pages: book.pages ?? levelGuess?.pages ?? null,
-    })
+    toApiShape(
+      {
+        known: true,
+        ...levelGuess,
+        pages: book.pages ?? levelGuess?.pages ?? null,
+      },
+      wasCorrected ? { title: book.title, author: book.author } : null
+    )
   );
+}
+
+// A kid-typed title/author is prone to typos ("Diary of a Whimpy Kid", "Jeff
+// Kinny") that can make an otherwise-findable book return zero results from
+// every external source. Only fixes spelling/casing of a book the model is
+// genuinely confident it recognizes — explicitly told not to "correct" a title
+// it doesn't actually know, since a wrong guess here would be worse than
+// leaving a typo alone (every downstream lookup still tries the original text
+// if this returns nothing different).
+async function correctTypos(apiKey, title, author) {
+  const prompt = `A child typed this book title${author ? " and author" : ""}, possibly with a spelling mistake: title "${title}"${
+    author ? `, author "${author}"` : ""
+  }.
+
+If — and only if — you recognize this as a real, specific, well-known book despite a typo, respond with the corrected spelling. If you don't clearly recognize it, or you're just guessing, return the title/author completely unchanged rather than inventing a "fix" for something you don't actually know.
+
+Respond with ONLY this JSON, no other text, no markdown fences:
+{"title": "corrected or unchanged title"${author ? ', "author": "corrected or unchanged author"' : ""}}`;
+
+  const result = await callGroq(apiKey, prompt);
+  return {
+    title: typeof result?.title === "string" && result.title.trim() ? result.title.trim() : title,
+    author: author ? (typeof result?.author === "string" && result.author.trim() ? result.author.trim() : author) : author,
+  };
 }
 
 // Renames the model's "lexile" field to "lit_score" at our API boundary — the
 // model understands "Lexile" as a concept, but we don't show that trademarked
 // term to users since these are our own estimates, not licensed Lexile scores.
-function toApiShape(result) {
-  if (!result?.known) return { known: false };
+// `corrected` (when a typo fix was applied) is merged in so the client can
+// save the cleaned-up spelling instead of what was actually typed.
+function toApiShape(result, corrected) {
+  if (!result?.known) return { known: false, ...(corrected ? corrected : {}) };
   const { lexile, ...rest } = result;
-  return { ...rest, lit_score: lexile ?? null };
+  return { ...rest, lit_score: lexile ?? null, ...(corrected ? corrected : {}) };
 }
 
 const WIKI_HEADERS = { "User-Agent": "Litquest/1.0 (family reading app; contact via GitHub)" };

@@ -6,16 +6,11 @@
 
 const OL_HEADERS = { "User-Agent": "Litquest/1.0 (family reading app; contact via GitHub)" };
 
-// A free-text query ranks far better than structured title=/author= fields —
-// those often miss the plain canonical edition entirely in favor of study
-// guides, workbooks, and adaptations that happen to match the fields exactly.
-//
-// Open Library's search silently returns zero results for a query containing
-// "&" (e.g. a co-author byline like "Natalie Riess & Sara Goetter") — no error,
-// just an empty doc list — so swap it for "and" before searching.
-export async function findOpenLibraryBook(title, author) {
-  const query = author ? `${title} ${author}` : title;
+async function olSearch(query) {
   const params = new URLSearchParams({
+    // Open Library's search silently returns zero results for a query containing
+    // "&" (e.g. a co-author byline like "Natalie Riess & Sara Goetter") — no
+    // error, just an empty doc list — so swap it for "and" before searching.
     q: query.replace(/&/g, " and "),
     fields: "key,title,author_name,first_publish_year,number_of_pages_median,subject",
     limit: "5",
@@ -25,12 +20,28 @@ export async function findOpenLibraryBook(title, author) {
   try {
     res = await fetch(`https://openlibrary.org/search.json?${params}`, { headers: OL_HEADERS });
   } catch {
-    return null;
+    return [];
   }
-  if (!res.ok) return null;
+  if (!res.ok) return [];
 
   const data = await res.json().catch(() => null);
-  const docs = data?.docs || [];
+  return data?.docs || [];
+}
+
+// A free-text query ranks far better than structured title=/author= fields —
+// those often miss the plain canonical edition entirely in favor of study
+// guides, workbooks, and adaptations that happen to match the fields exactly.
+//
+// A kid-typed author name is prone to typos ("Jeff Kinny" for "Jeff Kinney") —
+// and combining a misspelled author into the query can make an otherwise
+// perfectly findable title return zero results outright, not just rank lower.
+// So title+author is tried first (most precise when both are right), falling
+// back to title alone if that comes up empty and an author was given.
+export async function findOpenLibraryBook(title, author) {
+  let docs = author ? await olSearch(`${title} ${author}`) : await olSearch(title);
+  if (docs.length === 0 && author) {
+    docs = await olSearch(title);
+  }
   if (docs.length === 0) return null;
 
   // Trust Open Library's own relevance ranking for the top pick. Only look further

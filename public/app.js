@@ -669,12 +669,27 @@ async function tryAutoLookupLevel() {
 
   lookupStatus.textContent = "🔍 Looking up this book...";
 
+  const typedAuthor = authorInput.value.trim();
+
   try {
     const result = await api("/api/lookup-level", {
       method: "POST",
-      body: JSON.stringify({ title, author: authorInput.value.trim() }),
+      body: JSON.stringify({ title, author: typedAuthor }),
     });
     if (myToken !== lookupToken) return; // a newer lookup superseded this one
+
+    // A typo fix comes back as different title/author text — apply it to the
+    // fields (this doesn't fire the 'input' listener, so it won't invalidate
+    // the lookup result we're about to store) and mention it, so what actually
+    // gets saved is the corrected spelling, not what was typed.
+    let correctionNote = "";
+    if (result.title && result.title !== title) {
+      titleInput.value = result.title;
+      correctionNote += ` (corrected from "${title}")`;
+    }
+    if (result.author && result.author !== typedAuthor) {
+      authorInput.value = result.author;
+    }
 
     if (result.known && Number.isFinite(result.grade_level_num) && result.grade_level_num < 4) {
       lastLookupResult = null;
@@ -687,10 +702,12 @@ async function tryAutoLookupLevel() {
       if (result.lit_score) parts.push(`LitScore ${formatLitScore(result.lit_score)}`);
       if (result.pages) parts.push(`~${result.pages} pages`);
       lookupStatus.textContent =
-        parts.length > 0 ? `📖 Found it: ${parts.join(" · ")}` : "Found the book, but couldn't estimate its details.";
+        (parts.length > 0 ? `📖 Found it: ${parts.join(" · ")}` : "Found the book, but couldn't estimate its details.") +
+        correctionNote;
     } else {
       lastLookupResult = null;
-      lookupStatus.textContent = "Couldn't identify this book — it'll use default scoring (short book, no level bonus).";
+      lookupStatus.textContent =
+        "Couldn't identify this book — it'll use default scoring (short book, no level bonus)." + correctionNote;
     }
   } catch {
     if (myToken !== lookupToken) return;
