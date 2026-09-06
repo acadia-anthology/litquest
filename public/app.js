@@ -466,7 +466,7 @@ function bookRow(book, actionBtn) {
         <span class="date-label">${dateLabel}</span>
         ${quizScoreLine}
       </div>
-      <button type="button" class="edit-dates-btn" title="Edit dates">✏️</button>
+      <button type="button" class="edit-dates-btn" title="Edit title, author, or dates">✏️</button>
       <button type="button" class="delete-book-btn" title="Delete this book">🗑️</button>
     </div>
   `;
@@ -505,25 +505,55 @@ function toggleDateEditor(cardEl, book) {
   const form = document.createElement("div");
   form.className = "edit-dates-form";
   form.innerHTML = `
+    <label>Title <input type="text" value="${escapeHtml(book.title)}" class="edit-title" /></label>
+    <label>Author <input type="text" value="${escapeHtml(book.author || "")}" class="edit-author" /></label>
     <label>Started <input type="date" value="${book.added_at || ""}" class="edit-started" /></label>
     <label>Finished <input type="date" value="${book.finished_at || ""}" class="edit-finished" /></label>
+    <p class="lookup-status edit-status" hidden></p>
     <div class="row-actions">
       <button type="button" class="btn edit-cancel">Cancel</button>
       <button type="button" class="btn primary edit-save">Save</button>
     </div>
   `;
 
+  const statusEl = form.querySelector(".edit-status");
   form.querySelector(".edit-cancel").addEventListener("click", () => form.remove());
   form.querySelector(".edit-save").addEventListener("click", async () => {
     const started = form.querySelector(".edit-started").value;
     const finished = form.querySelector(".edit-finished").value;
-    await api(`/api/books/${book.id}`, {
-      method: "PATCH",
-      body: JSON.stringify({ added_at: started, finished_at: finished || null }),
-    });
+    const newTitle = form.querySelector(".edit-title").value.trim();
+    const newAuthor = form.querySelector(".edit-author").value.trim();
+    const titleOrAuthorChanged = normTitle(newTitle) !== normTitle(book.title) || newAuthor !== (book.author || "");
+
+    const saveBtn = form.querySelector(".edit-save");
+    if (titleOrAuthorChanged) {
+      saveBtn.disabled = true;
+      saveBtn.textContent = "Re-checking book...";
+      statusEl.hidden = false;
+      statusEl.textContent = "🔍 Title or author changed — re-checking LitScore, pages, and points...";
+    }
+
+    try {
+      await api(`/api/books/${book.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          added_at: started,
+          finished_at: finished || null,
+          title: newTitle,
+          author: newAuthor,
+        }),
+      });
+    } catch (err) {
+      saveBtn.disabled = false;
+      saveBtn.textContent = "Save";
+      statusEl.hidden = false;
+      statusEl.textContent = `⚠️ ${err.message}`;
+      return;
+    }
     await loadBooks();
     await loadMonthOptions();
     await loadBookBars();
+    await loadPlayers();
   });
 
   cardEl.appendChild(form);
