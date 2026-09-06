@@ -42,7 +42,16 @@ export async function onRequestPost(context) {
   const corrected = await correctTypos(env.GROQ_API_KEY, rawTitle, rawAuthor).catch(() => null);
   const title = corrected?.title || rawTitle;
   const author = corrected?.author ?? rawAuthor;
-  const wasCorrected = title !== rawTitle || author !== rawAuthor;
+  // Only the fields the AI actually changed get sent back for saving — e.g. if
+  // just the author had a typo, the client's own (perfectly fine) title text
+  // shouldn't get silently swapped for Open Library's own catalog title, which
+  // can be a differently-formatted variant (a specific volume sometimes listed
+  // under just its subtitle, e.g. "No Brainer" instead of "Diary of a Wimpy
+  // Kid: No Brainer") rather than an actual correction of anything.
+  const correctedFields = {};
+  if (title !== rawTitle) correctedFields.title = title;
+  if (author !== rawAuthor) correctedFields.author = author;
+  const hasCorrections = Object.keys(correctedFields).length > 0;
 
   const ol = await findOpenLibraryBook(title, author).catch(() => null);
   let book = ol && { title: ol.title, author: ol.author, year: ol.year, pages: ol.pages };
@@ -67,7 +76,7 @@ export async function onRequestPost(context) {
 
   if (!book) {
     const guess = await aiFullGuess(env.GROQ_API_KEY, title, author);
-    return Response.json(toApiShape(guess, wasCorrected ? { title, author } : null));
+    return Response.json(toApiShape(guess, hasCorrections ? correctedFields : null));
   }
 
   if (!genreHint) {
@@ -83,7 +92,7 @@ export async function onRequestPost(context) {
         ...levelGuess,
         pages: book.pages ?? levelGuess?.pages ?? null,
       },
-      wasCorrected ? { title: book.title, author: book.author } : null
+      hasCorrections ? correctedFields : null
     )
   );
 }
