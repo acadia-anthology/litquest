@@ -634,6 +634,7 @@ document.getElementById("cancelAddBook").addEventListener("click", () => {
 
 let lookupToken = 0;
 let lastLookupResult = null; // { grade_level, grade_level_num, lit_score, book_type, complexity, pages } — drives scoring, not user-editable
+let pendingLookup = null; // in-flight tryAutoLookupLevel() promise — submit awaits this so a fast kid clicking through can't submit before it resolves
 
 // Any edit after a lookup invalidates it, so a stale result for a since-changed
 // title/author never gets submitted.
@@ -716,13 +717,29 @@ async function tryAutoLookupLevel() {
   }
 }
 
-authorInput.addEventListener("blur", tryAutoLookupLevel);
+authorInput.addEventListener("blur", () => {
+  pendingLookup = tryAutoLookupLevel();
+});
 titleInput.addEventListener("blur", () => {
-  if (!authorInput.value.trim()) tryAutoLookupLevel();
+  if (!authorInput.value.trim()) pendingLookup = tryAutoLookupLevel();
 });
 
 addBookForm.addEventListener("submit", async (e) => {
   e.preventDefault();
+  // A kid can type both fields and hit submit faster than the async lookup
+  // finishes — without this, the book would save with none of its details
+  // filled in even though the lookup was about to succeed a moment later.
+  if (pendingLookup) {
+    const originalText = addBookSubmitBtn.textContent;
+    addBookSubmitBtn.disabled = true;
+    addBookSubmitBtn.textContent = "Looking up book...";
+    await pendingLookup;
+    addBookSubmitBtn.textContent = originalText;
+    // tryAutoLookupLevel leaves the button disabled on its own when the book
+    // genuinely can't be logged (K-3 floor, already-logged duplicate) — respect
+    // that instead of forcing it back open.
+    if (addBookSubmitBtn.disabled) return;
+  }
   const form = e.target;
   const levelParts = [];
   if (lastLookupResult?.book_type) levelParts.push(lastLookupResult.book_type);

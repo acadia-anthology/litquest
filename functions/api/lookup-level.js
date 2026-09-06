@@ -116,9 +116,37 @@ Respond with ONLY this JSON, no other text, no markdown fences:
 
   const result = await callGroq(apiKey, prompt);
   return {
-    title: typeof result?.title === "string" && result.title.trim() ? result.title.trim() : title,
-    author: author ? (typeof result?.author === "string" && result.author.trim() ? result.author.trim() : author) : author,
+    title: acceptIfCloseEnough(title, result?.title),
+    author: author ? acceptIfCloseEnough(author, result?.author) : author,
   };
+}
+
+// A hard backstop, not just a prompt instruction: if the model's "correction"
+// is too different from the original to plausibly be a spelling fix — e.g. it
+// swapped to a different book entirely by the same author, rather than fixing
+// a typo in this one — the original text is kept instead. Never trust prompt
+// compliance alone for something a wrong guess could silently corrupt.
+function acceptIfCloseEnough(original, candidate) {
+  if (typeof candidate !== "string" || !candidate.trim()) return original;
+  const trimmed = candidate.trim();
+  if (trimmed === original) return original;
+  const distance = levenshtein(original.toLowerCase(), trimmed.toLowerCase());
+  const ratio = distance / Math.max(original.length, trimmed.length, 1);
+  return ratio <= 0.35 ? trimmed : original;
+}
+
+function levenshtein(a, b) {
+  const rows = a.length + 1;
+  const cols = b.length + 1;
+  const dist = Array.from({ length: rows }, (_, i) => [i, ...Array(cols - 1).fill(0)]);
+  for (let j = 1; j < cols; j++) dist[0][j] = j;
+  for (let i = 1; i < rows; i++) {
+    for (let j = 1; j < cols; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      dist[i][j] = Math.min(dist[i - 1][j] + 1, dist[i][j - 1] + 1, dist[i - 1][j - 1] + cost);
+    }
+  }
+  return dist[rows - 1][cols - 1];
 }
 
 // Renames the model's "lexile" field to "lit_score" at our API boundary — the
