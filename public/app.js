@@ -644,6 +644,7 @@ function resetAddBookForm() {
   lookupStatus.hidden = true;
   lookupToken++;
   lastLookupResult = null;
+  lookupBlocksSubmit = false;
 }
 
 alreadyFinishedCheckbox.addEventListener("change", () => {
@@ -665,6 +666,11 @@ document.getElementById("cancelAddBook").addEventListener("click", () => {
 let lookupToken = 0;
 let lastLookupResult = null; // { grade_level, grade_level_num, lit_score, book_type, complexity, pages } — drives scoring, not user-editable
 let pendingLookup = null; // in-flight tryAutoLookupLevel() promise — submit awaits this so a fast kid clicking through can't submit before it resolves
+// Whether the lookup determined this book genuinely can't be logged (K-3 floor,
+// already-logged duplicate) — a dedicated flag rather than reading the submit
+// button's own disabled state, since submit toggles that itself for its
+// "Looking up book..." UI and would otherwise stomp on/misread this.
+let lookupBlocksSubmit = false;
 
 // Any edit after a lookup invalidates it, so a stale result for a since-changed
 // title/author never gets submitted.
@@ -673,6 +679,7 @@ function invalidateLookup() {
     lastLookupResult = null;
     lookupStatus.hidden = true;
   }
+  lookupBlocksSubmit = false;
   addBookSubmitBtn.disabled = false;
 }
 titleInput.addEventListener("input", invalidateLookup);
@@ -688,11 +695,13 @@ async function tryAutoLookupLevel() {
 
   const myToken = ++lookupToken;
   lookupStatus.hidden = false;
+  lookupBlocksSubmit = false;
   addBookSubmitBtn.disabled = false;
 
   const titleNorm = normTitle(title);
   if (currentBooks.some((b) => normTitle(b.title) === titleNorm)) {
     lastLookupResult = null;
+    lookupBlocksSubmit = true;
     addBookSubmitBtn.disabled = true;
     lookupStatus.textContent = "📚 This book is already logged on this profile.";
     return;
@@ -724,6 +733,7 @@ async function tryAutoLookupLevel() {
 
     if (result.known && Number.isFinite(result.grade_level_num) && result.grade_level_num < 4) {
       lastLookupResult = null;
+      lookupBlocksSubmit = true;
       addBookSubmitBtn.disabled = true;
       lookupStatus.textContent = `🚫 This looks like a ${result.grade_level || "K-3"} book — Litquest only logs 4th grade and up.`;
     } else if (result.known) {
@@ -765,10 +775,10 @@ addBookForm.addEventListener("submit", async (e) => {
     addBookSubmitBtn.textContent = "Looking up book...";
     await pendingLookup;
     addBookSubmitBtn.textContent = originalText;
-    // tryAutoLookupLevel leaves the button disabled on its own when the book
-    // genuinely can't be logged (K-3 floor, already-logged duplicate) — respect
-    // that instead of forcing it back open.
-    if (addBookSubmitBtn.disabled) return;
+    addBookSubmitBtn.disabled = lookupBlocksSubmit;
+    // The lookup itself determined this book genuinely can't be logged (K-3
+    // floor, already-logged duplicate) — respect that instead of submitting.
+    if (lookupBlocksSubmit) return;
   }
   const form = e.target;
   const levelParts = [];
