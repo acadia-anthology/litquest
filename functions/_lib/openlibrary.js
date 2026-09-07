@@ -18,7 +18,10 @@ async function olSearch(query) {
 
   let res;
   try {
-    res = await fetch(`https://openlibrary.org/search.json?${params}`, { headers: OL_HEADERS });
+    res = await fetch(`https://openlibrary.org/search.json?${params}`, {
+      headers: OL_HEADERS,
+      signal: AbortSignal.timeout(5000),
+    });
   } catch {
     return [];
   }
@@ -82,7 +85,10 @@ export async function findOpenLibraryDescription(workKey) {
   if (!workKey) return null;
   let res;
   try {
-    res = await fetch(`https://openlibrary.org${workKey}.json`, { headers: OL_HEADERS });
+    res = await fetch(`https://openlibrary.org${workKey}.json`, {
+      headers: OL_HEADERS,
+      signal: AbortSignal.timeout(5000),
+    });
   } catch {
     return null;
   }

@@ -11,18 +11,24 @@ const GOODREADS_HEADERS = {
   "Accept-Language": "en-US,en;q=0.9",
 };
 
-// Goodreads intermittently 503s/blocks datacenter IPs and clears up within a
-// couple seconds — worth a couple of retries. A 404 is a real "doesn't exist"
-// though, not worth retrying.
-async function grGet(url, referer, attempts = 3) {
+// Goodreads' anti-bot WAF blocks Cloudflare's network outright in practice —
+// confirmed live, repeatedly, not a hunch — so this is a single quick try, not
+// a patient retry loop. Patient retrying against a source that has never once
+// actually worked from this network only adds latency for zero benefit; a
+// prior version retried 3x with backoff *twice* (title-only, then
+// title+author) when nothing else found the book, which could add 20+ seconds
+// of pure waiting before ever reaching the AI fallback. Each attempt is also
+// hard-capped at 4s — Goodreads being merely *slow* (not erroring) shouldn't
+// be able to hang the request either.
+async function grGet(url, referer, attempts = 1) {
   for (let attempt = 0; attempt < attempts; attempt++) {
     try {
       const headers = referer ? { ...GOODREADS_HEADERS, Referer: referer } : GOODREADS_HEADERS;
-      const res = await fetch(url, { headers });
+      const res = await fetch(url, { headers, signal: AbortSignal.timeout(4000) });
       if (res.status === 200) return await res.text();
       if (res.status === 404) return null;
     } catch {
-      // fall through to retry
+      // fall through to retry (or return null below if out of attempts)
     }
     if (attempt < attempts - 1) {
       await new Promise((resolve) => setTimeout(resolve, 1500 * (attempt + 1)));
@@ -84,12 +90,8 @@ async function grLookup(query, attempts) {
   return parseGoodreadsBookHtml(bookHtml);
 }
 
-// `attempts` defaults to a patient 3 retries — appropriate when Goodreads is
-// the last real chance to identify or ground the book at all. Callers that
-// already have other grounding and just want Goodreads as enrichment should
-// pass a lower value (1 = no retry) so a Goodreads hiccup or block can't add
-// multiple seconds of retry/backoff for no benefit when a fallback exists.
-export async function findGoodreadsBook(title, author, attempts = 3) {
+// `attempts` defaults to 1 (no retry) — see the note on grGet above for why.
+export async function findGoodreadsBook(title, author, attempts = 1) {
   const result = await grLookup(title, attempts);
   if (result) return result;
   return author ? grLookup(`${title} ${author}`, attempts) : null;

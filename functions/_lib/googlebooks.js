@@ -13,7 +13,10 @@ export async function findGoogleBook(title, author, apiKey) {
 
   let res;
   try {
-    res = await fetch(url, { headers: { "User-Agent": "Litquest/1.0 (family reading app; contact via GitHub)" } });
+    res = await fetch(url, {
+      headers: { "User-Agent": "Litquest/1.0 (family reading app; contact via GitHub)" },
+      signal: AbortSignal.timeout(5000),
+    });
   } catch {
     return null;
   }

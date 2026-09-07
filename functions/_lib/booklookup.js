@@ -61,12 +61,11 @@ export async function lookupBook(env, rawTitleInput, rawAuthorInput) {
   }
 
   if (!book || !genreHint) {
-    // Goodreads' WAF sometimes challenges/blocks scraper traffic outright — when
-    // there's already a book and/or genre hint, this is pure enrichment, so it
-    // gets exactly one quick attempt rather than the patient retry below; a miss
-    // here just falls through to Wikipedia instead of costing the whole request
-    // several extra seconds of retry/backoff.
-    const gr = await findGoodreadsBook(title, author, book && genreHint ? 1 : 3).catch(() => null);
+    // Goodreads' WAF blocks Cloudflare's network outright in practice, so this
+    // is one quick, bounded try (findGoodreadsBook doesn't retry by default) —
+    // a miss just falls through to Wikipedia/the blind guess instead of costing
+    // the whole request many extra seconds for a source that rarely helps here.
+    const gr = await findGoodreadsBook(title, author).catch(() => null);
     if (!book && gr) book = { title, author: author || null, year: null, pages: gr.pages };
     if (!genreHint && gr?.genres?.length > 0) genreHint = `Genre tags: ${gr.genres.join(", ")}`;
   }
@@ -166,7 +165,7 @@ async function findWikipediaGenreHint(title, author) {
     `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(
       searchQuery
     )}&format=json&srlimit=1`,
-    { headers: WIKI_HEADERS }
+    { headers: WIKI_HEADERS, signal: AbortSignal.timeout(5000) }
   );
   if (!searchRes.ok) return null;
   const searchData = await searchRes.json();
@@ -177,7 +176,7 @@ async function findWikipediaGenreHint(title, author) {
     `https://en.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(
       pageTitle
     )}&prop=extracts&explaintext=1&exintro=1&redirects=1&format=json`,
-    { headers: WIKI_HEADERS }
+    { headers: WIKI_HEADERS, signal: AbortSignal.timeout(5000) }
   );
   if (!extractRes.ok) return null;
   const extractData = await extractRes.json();
@@ -199,6 +198,7 @@ async function callGroq(apiKey, prompt) {
       reasoning_effort: "low",
       messages: [{ role: "user", content: prompt }],
     }),
+    signal: AbortSignal.timeout(15000),
   });
   if (!res.ok) throw new Error(`Groq API returned ${res.status}`);
 

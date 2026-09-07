@@ -156,6 +156,7 @@ ${QUESTION_JSON_SHAPE}`;
       reasoning_effort: "low",
       messages: [{ role: "user", content: prompt }],
     }),
+    signal: AbortSignal.timeout(20000),
   });
 
   if (!res.ok) {
@@ -215,8 +216,8 @@ async function findPlotSummary(title, author, googleBooksKey) {
   if (gb?.description) return { text: gb.description, confidence: "publisher" };
 
   // Goodreads' anti-bot WAF blocks Cloudflare's network outright in practice, so
-  // this is a last-ditch attempt (2 quick tries) rather than something relied on.
-  const gr = await findGoodreadsBook(title, author, 2).catch(() => null);
+  // this is one quick, bounded try rather than something relied on.
+  const gr = await findGoodreadsBook(title, author).catch(() => null);
   if (gr?.description) return { text: gr.description, confidence: "publisher" };
 
   return wiki;
@@ -228,7 +229,7 @@ async function findWikipediaPlotSummary(title, author) {
     `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(
       searchQuery
     )}&format=json&srlimit=1`,
-    { headers: WIKI_HEADERS }
+    { headers: WIKI_HEADERS, signal: AbortSignal.timeout(5000) }
   );
   if (!searchRes.ok) return null;
   const searchData = await searchRes.json();
@@ -239,7 +240,7 @@ async function findWikipediaPlotSummary(title, author) {
     `https://en.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(
       pageTitle
     )}&prop=extracts&explaintext=1&exsectionformat=plain&redirects=1&format=json`,
-    { headers: WIKI_HEADERS }
+    { headers: WIKI_HEADERS, signal: AbortSignal.timeout(5000) }
   );
   if (!extractRes.ok) return null;
   const extractData = await extractRes.json();
