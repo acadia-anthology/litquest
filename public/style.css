@@ -141,6 +141,16 @@ h1, h2, .brand, .btn {
   cursor: pointer;
 }
 
+.streak-badge {
+  background: #fff1e0;
+  color: #d9770a;
+  font-weight: 800;
+  font-size: 0.85rem;
+  padding: 4px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
 .reader-type-label {
   margin-left: auto;
   font-family: 'Nunito', sans-serif;
@@ -198,6 +208,11 @@ main {
   cursor: pointer;
   background: #ece9ff;
   color: var(--text);
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 .btn.primary {
@@ -307,6 +322,25 @@ main {
 }
 
 .delete-book-btn:hover { opacity: 1; }
+
+.session-line {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.edit-session-btn,
+.delete-session-btn {
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 0.75rem;
+  padding: 0;
+  opacity: 0.5;
+}
+
+.edit-session-btn:hover,
+.delete-session-btn:hover { opacity: 1; }
 
 .edit-dates-form {
   display: flex;

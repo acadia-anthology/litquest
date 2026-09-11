@@ -4,6 +4,7 @@
 import { findOpenLibraryBook, findOpenLibraryDescription } from "../../../_lib/openlibrary.js";
 import { findGoogleBook } from "../../../_lib/googlebooks.js";
 import { findGoodreadsBook } from "../../../_lib/goodreads.js";
+import { checkStreakBonus } from "../../../_lib/streak.js";
 
 export async function onRequestGet(context) {
   const { env, params } = context;
@@ -47,6 +48,25 @@ export async function onRequestPost(context) {
   await env.DB.prepare("UPDATE books SET status = 'quiz_ready' WHERE id = ? AND status != 'completed'")
     .bind(params.id)
     .run();
+
+  // Marking a book finished with its timer still running is the single most
+  // common "forgot to stop it" case -- auto-stop rather than leaving it open.
+  const openSession = await env.DB.prepare(
+    "SELECT * FROM reading_sessions WHERE book_id = ? AND ended_at IS NULL"
+  )
+    .bind(params.id)
+    .first();
+  if (openSession) {
+    await env.DB.prepare(
+      `UPDATE reading_sessions
+       SET ended_at = datetime('now'),
+           minutes = MAX(1, CAST(ROUND((julianday('now') - julianday(started_at)) * 1440) AS INTEGER))
+       WHERE id = ?`
+    )
+      .bind(openSession.id)
+      .run();
+    await checkStreakBonus(env, openSession.player_id);
+  }
 
   return Response.json(toClientQuiz(quiz));
 }

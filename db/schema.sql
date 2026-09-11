@@ -47,6 +47,31 @@ CREATE TABLE IF NOT EXISTS books (
   finished_at TEXT
 );
 
+-- One row per start/stop of the reading timer. session_date is the local day
+-- (see _lib/date.js todayLocalDate) the session counts toward for streaks --
+-- fixed at start time so a session spanning midnight doesn't shift buckets.
+CREATE TABLE IF NOT EXISTS reading_sessions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  player_id INTEGER NOT NULL REFERENCES players(id),
+  book_id INTEGER NOT NULL REFERENCES books(id),
+  session_date TEXT NOT NULL,
+  started_at TEXT NOT NULL DEFAULT (datetime('now')),
+  ended_at TEXT,
+  minutes INTEGER
+);
+
+-- One row per streak milestone actually awarded (see _lib/streak.js) --
+-- UNIQUE guards against double-awarding the same milestone.
+CREATE TABLE IF NOT EXISTS streak_bonuses (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  player_id INTEGER NOT NULL REFERENCES players(id),
+  days INTEGER NOT NULL,
+  points_earned INTEGER NOT NULL DEFAULT 25,
+  bonus_date TEXT NOT NULL, -- todayLocalDate() at award time -- see reading_sessions.session_date for why
+  awarded_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE(player_id, days)
+);
+
 CREATE TABLE IF NOT EXISTS quizzes (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   book_id INTEGER NOT NULL REFERENCES books(id),

@@ -21,7 +21,11 @@ export async function onRequestGet(context) {
     `SELECT books.*,
             COALESCE((SELECT SUM(points_earned) FROM quiz_attempts WHERE quiz_attempts.book_id = books.id), 0) AS points_earned,
             (SELECT score FROM quiz_attempts WHERE quiz_attempts.book_id = books.id AND points_earned > 0 ORDER BY completed_at DESC LIMIT 1) AS quiz_score,
-            (SELECT total FROM quiz_attempts WHERE quiz_attempts.book_id = books.id AND points_earned > 0 ORDER BY completed_at DESC LIMIT 1) AS quiz_total
+            (SELECT total FROM quiz_attempts WHERE quiz_attempts.book_id = books.id AND points_earned > 0 ORDER BY completed_at DESC LIMIT 1) AS quiz_total,
+            (SELECT id FROM reading_sessions WHERE reading_sessions.book_id = books.id AND ended_at IS NULL) AS active_session_id,
+            (SELECT started_at FROM reading_sessions WHERE reading_sessions.book_id = books.id AND ended_at IS NULL) AS active_session_started_at,
+            (SELECT id FROM reading_sessions WHERE reading_sessions.book_id = books.id AND ended_at IS NOT NULL ORDER BY started_at DESC LIMIT 1) AS last_session_id,
+            (SELECT minutes FROM reading_sessions WHERE reading_sessions.book_id = books.id AND ended_at IS NOT NULL ORDER BY started_at DESC LIMIT 1) AS last_session_minutes
      FROM books WHERE player_id = ? ORDER BY added_at DESC`
   )
     .bind(playerId)

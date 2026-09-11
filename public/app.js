@@ -145,6 +145,10 @@ function renderProfileBar() {
   document.getElementById("pointsText").textContent = `${p.total_points} pts`;
   document.getElementById("xpFill").style.width = `${p.points_into_level}%`;
 
+  const streakBadge = document.getElementById("streakBadge");
+  streakBadge.hidden = !p.streak;
+  if (p.streak) streakBadge.textContent = `🔥 ${p.streak}`;
+
   const unlocked = ParentMode.isUnlocked();
   const readerTypeSelect = document.getElementById("readerTypeSelect");
   const readerTypeLabel = document.getElementById("readerTypeLabel");
@@ -502,6 +506,13 @@ function bookRow(book, actionBtn) {
       ? `<button type="button" class="quiz-score-label" title="See quiz questions">Quiz: ${book.quiz_score}/${book.quiz_total}</button>`
       : "";
 
+  const sessionLine = Number.isFinite(book.last_session_minutes)
+    ? `<span class="session-line">⏱ ${book.last_session_minutes}m
+        <button type="button" class="edit-session-btn" title="Edit minutes">✏️</button>
+        <button type="button" class="delete-session-btn" title="Delete this session">🗑️</button>
+      </span>`
+    : "";
+
   div.innerHTML = `
     <div class="row-main">
       ${pointsBadge}
@@ -514,6 +525,7 @@ function bookRow(book, actionBtn) {
       <div class="dates">
         <span class="date-label">${dateLabel}</span>
         ${quizScoreLine}
+        ${sessionLine}
       </div>
       <button type="button" class="edit-dates-btn" title="Edit title, author, or dates">✏️</button>
       <button type="button" class="delete-book-btn" title="Delete this book">🗑️</button>
@@ -524,6 +536,8 @@ function bookRow(book, actionBtn) {
   div.querySelector(".delete-book-btn").addEventListener("click", () => deleteBook(book));
   div.querySelector(".quiz-score-label")?.addEventListener("click", () => showQuizReview(book));
   div.querySelector(".points-badge")?.addEventListener("click", () => showPointsBreakdown(book));
+  div.querySelector(".edit-session-btn")?.addEventListener("click", () => toggleSessionEditor(div, book));
+  div.querySelector(".delete-session-btn")?.addEventListener("click", () => deleteSession(book));
 
   if (actionBtn) {
     actionBtn.classList.add("action-btn");
@@ -542,6 +556,82 @@ async function deleteBook(book) {
   await api(`/api/books/${book.id}`, { method: "DELETE" });
   await loadBooks();
   await loadPlayers();
+}
+
+// --- Reading timer ---
+
+function parseSqliteDate(s) {
+  return new Date(s.replace(" ", "T") + "Z");
+}
+
+async function startTimer(book) {
+  try {
+    await api("/api/reading-sessions", {
+      method: "POST",
+      body: JSON.stringify({ player_id: activePlayerId, book_id: book.id }),
+    });
+  } catch (err) {
+    alert(err.message);
+    return;
+  }
+  await loadBooks();
+}
+
+async function stopTimer(book) {
+  await api(`/api/reading-sessions/${book.active_session_id}`, {
+    method: "PATCH",
+    body: JSON.stringify({ action: "stop" }),
+  });
+  await loadBooks();
+  await loadPlayers();
+}
+
+function timerButton(book, anyActiveElsewhere) {
+  if (book.active_session_id) {
+    const elapsed = Math.max(1, Math.round((Date.now() - parseSqliteDate(book.active_session_started_at)) / 60000));
+    return makeButton(`⏹ Stop (${elapsed}m so far)`, () => stopTimer(book), false);
+  }
+  const btn = makeButton("▶️ Start Timer", () => startTimer(book), false);
+  btn.disabled = anyActiveElsewhere;
+  return btn;
+}
+
+function toggleSessionEditor(cardEl, book) {
+  const existing = cardEl.querySelector(".edit-dates-form");
+  if (existing) {
+    existing.remove();
+    return;
+  }
+
+  const form = document.createElement("div");
+  form.className = "edit-dates-form";
+  form.innerHTML = `
+    <label>Minutes <input type="number" min="1" max="720" value="${book.last_session_minutes}" class="edit-minutes" /></label>
+    <div class="row-actions">
+      <button type="button" class="btn edit-cancel">Cancel</button>
+      <button type="button" class="btn primary edit-save">Save</button>
+    </div>
+  `;
+  form.querySelector(".edit-cancel").addEventListener("click", () => form.remove());
+  form.querySelector(".edit-save").addEventListener("click", async () => {
+    try {
+      await api(`/api/reading-sessions/${book.last_session_id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ minutes: form.querySelector(".edit-minutes").value }),
+      });
+    } catch (err) {
+      alert(err.message);
+      return;
+    }
+    await loadBooks();
+  });
+  cardEl.appendChild(form);
+}
+
+async function deleteSession(book) {
+  if (!confirm(`Delete this ${book.last_session_minutes}m reading session?`)) return;
+  await api(`/api/reading-sessions/${book.last_session_id}`, { method: "DELETE" });
+  await loadBooks();
 }
 
 function toggleDateEditor(cardEl, book) {
@@ -617,10 +707,32 @@ function makeButton(label, onClick, primary = true) {
 }
 
 let currentBooks = [];
+let timerRefreshInterval = null;
+
+function streakBonusRow(bonus) {
+  const div = document.createElement("div");
+  div.className = "book-row";
+  div.innerHTML = `
+    <div class="row-main">
+      <span class="points-badge" style="cursor:default">+${bonus.points_earned} pts</span>
+      <div class="title-block">
+        <h3>🔥 ${bonus.days} Day Streak Bonus</h3>
+        <div class="meta">30+ minutes read, ${bonus.days} days in a row</div>
+      </div>
+    </div>
+    <div class="row-side">
+      <div class="dates"><span class="date-label">${formatDate(bonus.bonus_date)}</span></div>
+    </div>
+  `;
+  return div;
+}
 
 async function loadBooks() {
   if (!activePlayerId) return;
-  const books = await api(`/api/books?player_id=${activePlayerId}`);
+  const [books, streakBonuses] = await Promise.all([
+    api(`/api/books?player_id=${activePlayerId}`),
+    api(`/api/streak-bonuses?player_id=${activePlayerId}`),
+  ]);
   currentBooks = books;
   readingCards.innerHTML = "";
   quizReadyCards.innerHTML = "";
@@ -629,14 +741,19 @@ async function loadBooks() {
   const reading = books.filter((b) => b.status === "reading");
   const quizReady = books.filter((b) => b.status === "quiz_ready");
   const completed = books.filter((b) => b.status === "completed");
+  const anyActive = books.some((b) => b.active_session_id);
 
   if (reading.length === 0) readingCards.innerHTML = `<p class="empty-hint">Nothing here yet.</p>`;
   if (quizReady.length === 0) quizReadyCards.innerHTML = `<p class="empty-hint">Finish a book to unlock a quiz!</p>`;
-  if (completed.length === 0) completedCards.innerHTML = `<p class="empty-hint">Your finished quests will show up here.</p>`;
+  if (completed.length === 0 && streakBonuses.length === 0) {
+    completedCards.innerHTML = `<p class="empty-hint">Your finished quests will show up here.</p>`;
+  }
 
   reading.forEach((b) => {
     const finishBtn = makeButton("Finished it! 🎉", () => startQuiz(b));
-    readingCards.appendChild(bookRow(b, finishBtn));
+    const row = bookRow(b, finishBtn);
+    row.querySelector(".row-side").appendChild(timerButton(b, anyActive && !b.active_session_id));
+    readingCards.appendChild(row);
   });
 
   quizReady.forEach((b) => {
@@ -644,14 +761,17 @@ async function loadBooks() {
     quizReadyCards.appendChild(bookRow(b, quizBtn));
   });
 
+  const completedItems = [
+    ...completed.map((b) => ({ kind: "book", date: b.finished_at, data: b })),
+    ...streakBonuses.map((s) => ({ kind: "bonus", date: s.bonus_date, data: s })),
+  ].sort((a, b) => b.date.localeCompare(a.date));
+
   const byMonth = new Map();
-  [...completed]
-    .sort((a, b) => b.finished_at.localeCompare(a.finished_at))
-    .forEach((b) => {
-      const key = b.finished_at.slice(0, 7);
-      if (!byMonth.has(key)) byMonth.set(key, []);
-      byMonth.get(key).push(b);
-    });
+  completedItems.forEach((item) => {
+    const key = item.date.slice(0, 7);
+    if (!byMonth.has(key)) byMonth.set(key, []);
+    byMonth.get(key).push(item);
+  });
 
   [...byMonth.keys()]
     .sort()
@@ -661,8 +781,15 @@ async function loadBooks() {
       heading.className = "completed-month-heading";
       heading.textContent = monthLabel(key, true);
       completedCards.appendChild(heading);
-      byMonth.get(key).forEach((b) => completedCards.appendChild(bookRow(b)));
+      byMonth
+        .get(key)
+        .forEach((item) =>
+          completedCards.appendChild(item.kind === "bonus" ? streakBonusRow(item.data) : bookRow(item.data))
+        );
     });
+
+  clearInterval(timerRefreshInterval);
+  if (anyActive) timerRefreshInterval = setInterval(loadBooks, 60000);
 }
 
 // --- Add book ---
