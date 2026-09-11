@@ -51,6 +51,7 @@ parentModeForm.addEventListener("submit", async (e) => {
 ParentMode.onChange(() => {
   renderParentModeBtn();
   renderPlayerSwitcher();
+  renderProfileBar();
   loadGoalNotices();
 });
 
@@ -141,7 +142,9 @@ function renderProfileBar() {
   document.getElementById("levelBadge").textContent = `${p.avatar} Lv ${p.level}`;
   document.getElementById("pointsText").textContent = `${p.total_points} pts`;
   document.getElementById("xpFill").style.width = `${p.points_into_level}%`;
-  document.getElementById("readerTypeSelect").value = p.reader_type;
+  const readerTypeSelect = document.getElementById("readerTypeSelect");
+  readerTypeSelect.value = p.reader_type;
+  readerTypeSelect.disabled = !ParentMode.isUnlocked();
 }
 
 // --- Quest rewards ---
