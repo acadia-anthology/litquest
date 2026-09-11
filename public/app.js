@@ -136,15 +136,22 @@ function renderPlayerSwitcher() {
   }
 }
 
+const READER_TYPE_LABELS = { kid: "🍏 Kid profile", adult: "🍎 Adult profile" };
+
 function renderProfileBar() {
   const p = activePlayer();
   if (!p) return;
   document.getElementById("levelBadge").textContent = `${p.avatar} Lv ${p.level}`;
   document.getElementById("pointsText").textContent = `${p.total_points} pts`;
   document.getElementById("xpFill").style.width = `${p.points_into_level}%`;
+
+  const unlocked = ParentMode.isUnlocked();
   const readerTypeSelect = document.getElementById("readerTypeSelect");
+  const readerTypeLabel = document.getElementById("readerTypeLabel");
   readerTypeSelect.value = p.reader_type;
-  readerTypeSelect.disabled = !ParentMode.isUnlocked();
+  readerTypeSelect.hidden = !unlocked;
+  readerTypeLabel.hidden = unlocked;
+  readerTypeLabel.textContent = READER_TYPE_LABELS[p.reader_type] || p.reader_type;
 }
 
 // --- Quest rewards ---
