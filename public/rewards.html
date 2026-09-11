@@ -21,7 +21,7 @@
 
   <main hidden>
     <h1 class="rewards-title">⭐ Quest Rewards</h1>
-    <p class="rewards-subtitle">Kid profiles only. Editing needs the PIN.</p>
+    <p class="rewards-subtitle">Kid profiles only. Editing needs Parent Mode.</p>
 
     <div class="kid-picker-row">
       <label>Kid profile
@@ -30,7 +30,7 @@
     </div>
 
     <div id="lockedNotice" class="pin-gate">
-      <label>Enter PIN to edit<input type="password" id="pinInput" inputmode="numeric" maxlength="8" placeholder="••••" /></label>
+      <label>Enter PIN to unlock Parent Mode<input type="password" id="pinInput" inputmode="numeric" maxlength="8" placeholder="••••" /></label>
       <button type="button" class="btn primary" id="unlockBtn">Unlock</button>
       <p id="pinError" class="error-text" hidden>Incorrect PIN.</p>
     </div>
@@ -77,8 +77,19 @@
       <h2 class="archived-title">📦 Archived</h2>
       <div class="archived-list" id="archivedList"></div>
     </section>
+
+    <section class="quest-track" id="householdSection" hidden>
+      <h2>👪 Manage Household</h2>
+      <div class="rewards-list" id="parentsList"></div>
+      <form class="quest-add-form" id="addParentForm">
+        <input type="text" name="avatar" maxlength="4" placeholder="🧑" style="max-width:60px" />
+        <input type="text" name="name" required placeholder="Parent's name" />
+        <button type="submit" class="btn primary">Add Parent</button>
+      </form>
+    </section>
   </main>
 
+  <script src="/parent-mode.js"></script>
   <script src="/auth-gate.js" data-next="/rewards.js"></script>
 </body>
 </html>

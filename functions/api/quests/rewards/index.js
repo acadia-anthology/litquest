@@ -1,17 +1,20 @@
-// POST /api/quests/rewards { player_id, quest_type, reward_type, threshold, emoji, reward_text, pin }
+// POST /api/quests/rewards { player_id, quest_type, reward_type, threshold, emoji, reward_text }
 // -> add/update one reward tier. reward_type is "once" (fires at exactly threshold
 // points) or "repeat" (fires again every `threshold` points, e.g. every 500).
+// Parent-Mode-gated.
 
-const EDIT_PIN = "2112";
+import { isParentAuthed } from "../../../_lib/auth.js";
 
 export async function onRequestPost(context) {
   const { env, request } = context;
+
+  if (!(await isParentAuthed(request))) {
+    return Response.json({ error: "Parent Mode required" }, { status: 403 });
+  }
+
   const body = await request.json().catch(() => null);
 
-  if (body?.pin !== EDIT_PIN) {
-    return Response.json({ error: "Incorrect PIN" }, { status: 403 });
-  }
-  if (!body.player_id) {
+  if (!body?.player_id) {
     return Response.json({ error: "player_id is required" }, { status: 400 });
   }
   if (body.quest_type !== "side" && body.quest_type !== "main") {

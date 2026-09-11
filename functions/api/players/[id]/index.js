@@ -1,15 +1,19 @@
 // PATCH  /api/players/:id  { reader_type?, name?, avatar? }  -> change a player's
 // Kid/Adult reader type, rename the profile, and/or change its avatar emoji. At
-// least one field is required.
-// DELETE /api/players/:id  { pin }  -> permanently remove a player and everything
-// they logged (books, quizzes, quiz history, quest rewards). PIN-gated.
+// least one field is required. Parent-Mode-gated.
+// DELETE /api/players/:id  -> permanently remove a player and everything they
+// logged (books, quizzes, quiz history, quest rewards). Parent-Mode-gated.
 
 import { withLevel } from "../../../_lib/level.js";
-
-const EDIT_PIN = "2112";
+import { isParentAuthed } from "../../../_lib/auth.js";
 
 export async function onRequestPatch(context) {
   const { env, params, request } = context;
+
+  if (!(await isParentAuthed(request))) {
+    return Response.json({ error: "Parent Mode required" }, { status: 403 });
+  }
+
   const body = await request.json().catch(() => null);
 
   const hasReaderType = body?.reader_type !== undefined;
@@ -49,10 +53,9 @@ export async function onRequestPatch(context) {
 
 export async function onRequestDelete(context) {
   const { env, params, request } = context;
-  const body = await request.json().catch(() => null);
 
-  if (body?.pin !== EDIT_PIN) {
-    return Response.json({ error: "Incorrect PIN" }, { status: 403 });
+  if (!(await isParentAuthed(request))) {
+    return Response.json({ error: "Parent Mode required" }, { status: 403 });
   }
 
   const existing = await env.DB.prepare("SELECT id FROM players WHERE id = ?").bind(params.id).first();

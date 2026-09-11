@@ -1,4 +1,6 @@
 import { withLevel } from "../_lib/level.js";
+import { getHouseholdId } from "../_lib/household.js";
+import { isParentAuthed } from "../_lib/auth.js";
 
 // GET  /api/players  -> list every player with computed level, ranked by points (for the leaderboard)
 // POST /api/players   { name, avatar, reader_type }  -> create a new player/profile
@@ -13,6 +15,11 @@ export async function onRequestGet(context) {
 
 export async function onRequestPost(context) {
   const { env, request } = context;
+
+  if (!(await isParentAuthed(request))) {
+    return Response.json({ error: "Parent Mode required" }, { status: 403 });
+  }
+
   const body = await request.json().catch(() => null);
   if (!body || typeof body.name !== "string" || !body.name.trim()) {
     return Response.json({ error: "name is required" }, { status: 400 });
@@ -20,11 +27,12 @@ export async function onRequestPost(context) {
 
   const readerType = body.reader_type === "adult" ? "adult" : "kid";
   const defaultAvatar = readerType === "adult" ? "🍎" : "🍏";
+  const householdId = await getHouseholdId(env);
 
   const player = await env.DB.prepare(
-    "INSERT INTO players (name, avatar, reader_type) VALUES (?, ?, ?) RETURNING *"
+    "INSERT INTO players (household_id, name, avatar, reader_type) VALUES (?, ?, ?, ?) RETURNING *"
   )
-    .bind(body.name.trim(), body.avatar?.trim() || defaultAvatar, readerType)
+    .bind(householdId, body.name.trim(), body.avatar?.trim() || defaultAvatar, readerType)
     .first();
 
   return Response.json(withLevel(player), { status: 201 });

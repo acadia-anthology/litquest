@@ -11,6 +11,49 @@ const helpModal = document.getElementById("helpModal");
 document.getElementById("helpBtn").addEventListener("click", () => helpModal.showModal());
 document.getElementById("closeHelp").addEventListener("click", () => helpModal.close());
 
+// --- Parent Mode ---
+
+const parentModeBtn = document.getElementById("parentModeBtn");
+const parentModeModal = document.getElementById("parentModeModal");
+const parentModeForm = document.getElementById("parentModeForm");
+const parentModePin = document.getElementById("parentModePin");
+const parentModeError = document.getElementById("parentModeError");
+
+function renderParentModeBtn() {
+  const unlocked = ParentMode.isUnlocked();
+  parentModeBtn.textContent = unlocked ? "🔓" : "🔒";
+  parentModeBtn.title = unlocked ? "Parent Mode unlocked — tap to lock" : "Unlock Parent Mode";
+}
+
+parentModeBtn.addEventListener("click", async () => {
+  if (ParentMode.isUnlocked()) {
+    await ParentMode.lock();
+  } else {
+    parentModePin.value = "";
+    parentModeError.hidden = true;
+    parentModeModal.showModal();
+    parentModePin.focus();
+  }
+});
+
+document.getElementById("cancelParentMode").addEventListener("click", () => parentModeModal.close());
+
+parentModeForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const ok = await ParentMode.unlock(parentModePin.value);
+  if (ok) {
+    parentModeModal.close();
+  } else {
+    parentModeError.hidden = false;
+  }
+});
+
+ParentMode.onChange(() => {
+  renderParentModeBtn();
+  renderPlayerSwitcher();
+  loadGoalNotices();
+});
+
 const newQuestBtn = document.getElementById("newQuestBtn");
 const board = document.getElementById("board");
 
@@ -70,10 +113,11 @@ async function loadPlayers() {
 function renderPlayerSwitcher() {
   const el = document.getElementById("playerSwitcher");
   el.innerHTML = "";
+  const canEdit = ParentMode.isUnlocked();
   players.forEach((p) => {
     const btn = document.createElement("button");
     btn.className = `player-pill${p.id === activePlayerId ? " active" : ""}`;
-    btn.innerHTML = `${p.avatar} ${escapeHtml(p.name)} <span class="rename-player-btn" title="Rename">✏️</span>`;
+    btn.innerHTML = `${p.avatar} ${escapeHtml(p.name)} <span class="rename-player-btn" title="Rename"${canEdit ? "" : " hidden"}>✏️</span>`;
     btn.addEventListener("click", () => setActivePlayer(p.id));
     btn.querySelector(".rename-player-btn").addEventListener("click", (e) => {
       e.stopPropagation();
@@ -81,12 +125,14 @@ function renderPlayerSwitcher() {
     });
     el.appendChild(btn);
   });
-  const addBtn = document.createElement("button");
-  addBtn.className = "player-pill add-player";
-  addBtn.textContent = "+";
-  addBtn.title = "Add Player";
-  addBtn.addEventListener("click", () => addPlayerModal.showModal());
-  el.appendChild(addBtn);
+  if (canEdit) {
+    const addBtn = document.createElement("button");
+    addBtn.className = "player-pill add-player";
+    addBtn.textContent = "+";
+    addBtn.title = "Add Player";
+    addBtn.addEventListener("click", () => addPlayerModal.showModal());
+    el.appendChild(addBtn);
+  }
 }
 
 function renderProfileBar() {
@@ -222,8 +268,7 @@ async function showCelebration(claim) {
 
 async function loadGoalNotices() {
   const el = document.getElementById("goalNotices");
-  const p = activePlayer();
-  if (!p || p.reader_type !== "adult") {
+  if (!ParentMode.isUnlocked()) {
     el.innerHTML = "";
     return;
   }
@@ -364,13 +409,11 @@ document.getElementById("addPlayerForm").addEventListener("submit", async (e) =>
 const renamePlayerModal = document.getElementById("renamePlayerModal");
 const renamePlayerForm = document.getElementById("renamePlayerForm");
 const deleteProfileConfirm = document.getElementById("deleteProfileConfirm");
-const deleteProfilePin = document.getElementById("deleteProfilePin");
 const deleteProfileError = document.getElementById("deleteProfileError");
 let renamingPlayerId = null;
 
 function resetDeleteProfileConfirm() {
   deleteProfileConfirm.hidden = true;
-  deleteProfilePin.value = "";
   deleteProfileError.hidden = true;
 }
 
@@ -396,7 +439,6 @@ renamePlayerForm.addEventListener("submit", async (e) => {
 
 document.getElementById("deleteProfileBtn").addEventListener("click", () => {
   deleteProfileConfirm.hidden = false;
-  deleteProfilePin.focus();
 });
 
 document.getElementById("cancelDeleteProfile").addEventListener("click", () => resetDeleteProfileConfirm());
@@ -404,10 +446,7 @@ document.getElementById("cancelDeleteProfile").addEventListener("click", () => r
 document.getElementById("confirmDeleteProfile").addEventListener("click", async () => {
   deleteProfileError.hidden = true;
   try {
-    await api(`/api/players/${renamingPlayerId}`, {
-      method: "DELETE",
-      body: JSON.stringify({ pin: deleteProfilePin.value }),
-    });
+    await api(`/api/players/${renamingPlayerId}`, { method: "DELETE" });
   } catch (err) {
     deleteProfileError.textContent = err.message;
     deleteProfileError.hidden = false;
@@ -1013,6 +1052,8 @@ async function showPointsBreakdown(book) {
 // --- init ---
 
 (async function init() {
+  await ParentMode.check();
+  renderParentModeBtn();
   await loadPlayers();
   if (activePlayerId) await loadBooks();
 })();

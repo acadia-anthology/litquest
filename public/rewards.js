@@ -29,7 +29,6 @@ function rewardLabel(r) {
 }
 
 let unlocked = false;
-let pin = null;
 let kids = [];
 let activeKidId = null;
 
@@ -138,7 +137,6 @@ function toggleEditReward(rowEl, reward) {
           reward_type: form.querySelector(".edit-mode").value,
           emoji: form.querySelector(".edit-emoji").value,
           reward_text: form.querySelector(".edit-text").value,
-          pin,
         }),
       });
       await loadQuests();
@@ -152,7 +150,7 @@ function toggleEditReward(rowEl, reward) {
 async function deleteReward(id) {
   if (!confirm("Delete this reward?")) return;
   try {
-    await api(`/api/quests/rewards/${id}`, { method: "DELETE", body: JSON.stringify({ pin }) });
+    await api(`/api/quests/rewards/${id}`, { method: "DELETE" });
     await loadQuests();
   } catch (err) {
     alert(err.message);
@@ -175,7 +173,6 @@ async function deleteReward(id) {
           threshold,
           emoji: form.emoji.value,
           reward_text: form.reward_text.value,
-          pin,
         }),
       });
       form.reset();
@@ -208,18 +205,79 @@ async function loadArchive() {
     .join("");
 }
 
-document.getElementById("unlockBtn").addEventListener("click", () => {
+document.getElementById("unlockBtn").addEventListener("click", async () => {
   const entered = document.getElementById("pinInput").value;
   const pinError = document.getElementById("pinError");
-  if (entered === "2112") {
-    pin = entered;
+  const ok = await ParentMode.unlock(entered);
+  if (ok) {
     unlocked = true;
     document.getElementById("lockedNotice").hidden = true;
     pinError.hidden = true;
-    loadQuests();
+    document.getElementById("householdSection").hidden = false;
+    await Promise.all([loadQuests(), loadParents()]);
   } else {
     pinError.hidden = false;
   }
 });
 
-loadKids();
+// --- Manage Household (parents) ---
+
+async function loadParents() {
+  const list = document.getElementById("parentsList");
+  const parents = await api("/api/parents");
+  if (parents.length === 0) {
+    list.innerHTML = `<p class="empty-hint">No parents added yet.</p>`;
+  } else {
+    list.innerHTML = parents
+      .map(
+        (p) => `
+      <div class="reward-row" data-id="${p.id}">
+        <span class="reward-emoji">${p.avatar}</span>
+        <span class="reward-text">${escapeHtml(p.name)}</span>
+        <span class="reward-actions">
+          <button type="button" class="delete-parent-btn" data-id="${p.id}" title="Remove">🗑️</button>
+        </span>
+      </div>
+    `
+      )
+      .join("");
+    list.querySelectorAll(".delete-parent-btn").forEach((btn) => {
+      btn.addEventListener("click", () => deleteParent(btn.dataset.id));
+    });
+  }
+}
+
+async function deleteParent(id) {
+  if (!confirm("Remove this parent?")) return;
+  try {
+    await api(`/api/parents/${id}`, { method: "DELETE" });
+    await loadParents();
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+document.getElementById("addParentForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const form = e.target;
+  try {
+    await api("/api/parents", {
+      method: "POST",
+      body: JSON.stringify({ name: form.name.value, avatar: form.avatar.value }),
+    });
+    form.reset();
+    await loadParents();
+  } catch (err) {
+    alert(err.message);
+  }
+});
+
+(async function init() {
+  unlocked = await ParentMode.check();
+  if (unlocked) {
+    document.getElementById("lockedNotice").hidden = true;
+    document.getElementById("householdSection").hidden = false;
+    await loadParents();
+  }
+  await loadKids();
+})();

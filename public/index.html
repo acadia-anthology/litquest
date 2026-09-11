@@ -16,6 +16,7 @@
     <div class="brand">📚 <span>Litquest</span></div>
     <div class="topbar-right">
       <div class="player-switcher" id="playerSwitcher"></div>
+      <button type="button" class="help-btn" id="parentModeBtn" title="Unlock Parent Mode">🔒</button>
       <button type="button" class="help-btn" id="helpBtn" title="How points work">?</button>
       <a href="/rewards" class="rewards-star-btn" title="Reward ladder">⭐</a>
     </div>
@@ -183,13 +184,25 @@
         <button type="submit" class="btn primary">Save</button>
       </div>
       <div id="deleteProfileConfirm" class="delete-confirm" hidden>
-        <p class="error-text">This permanently deletes this profile and everything it logged. Enter the PIN to confirm.</p>
+        <p class="error-text">This permanently deletes this profile and everything it logged.</p>
         <div class="pin-gate">
-          <input type="password" id="deleteProfilePin" inputmode="numeric" maxlength="8" placeholder="••••" />
           <button type="button" class="btn" id="cancelDeleteProfile">Cancel</button>
           <button type="button" class="btn danger" id="confirmDeleteProfile">Confirm Delete</button>
         </div>
-        <p id="deleteProfileError" class="error-text" hidden>Incorrect PIN.</p>
+        <p id="deleteProfileError" class="error-text" hidden></p>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Parent Mode unlock modal -->
+  <dialog id="parentModeModal">
+    <form class="modal-form" id="parentModeForm">
+      <h2>🔒 Unlock Parent Mode</h2>
+      <label>PIN<input type="password" id="parentModePin" inputmode="numeric" maxlength="8" placeholder="••••" /></label>
+      <p id="parentModeError" class="error-text" hidden>Incorrect PIN.</p>
+      <div class="modal-actions">
+        <button type="button" class="btn" id="cancelParentMode">Cancel</button>
+        <button type="submit" class="btn primary">Unlock</button>
       </div>
     </form>
   </dialog>
@@ -239,6 +252,7 @@
     </div>
   </dialog>
 
+  <script src="/parent-mode.js"></script>
   <script src="/auth-gate.js" data-next="/app.js"></script>
 </body>
 </html>

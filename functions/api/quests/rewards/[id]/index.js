@@ -1,14 +1,19 @@
-// PATCH  /api/quests/rewards/:id  { threshold?, reward_type?, emoji?, reward_text?, pin }  -> edit one tier in place
-// DELETE /api/quests/rewards/:id  { pin }                                                  -> remove one reward tier
+// PATCH  /api/quests/rewards/:id  { threshold?, reward_type?, emoji?, reward_text? }  -> edit one tier in place
+// DELETE /api/quests/rewards/:id                                                      -> remove one reward tier
+// Both Parent-Mode-gated.
 
-const EDIT_PIN = "2112";
+import { isParentAuthed } from "../../../../_lib/auth.js";
 
 export async function onRequestPatch(context) {
   const { env, params, request } = context;
-  const body = await request.json().catch(() => null);
 
-  if (body?.pin !== EDIT_PIN) {
-    return Response.json({ error: "Incorrect PIN" }, { status: 403 });
+  if (!(await isParentAuthed(request))) {
+    return Response.json({ error: "Parent Mode required" }, { status: 403 });
+  }
+
+  const body = await request.json().catch(() => null);
+  if (!body) {
+    return Response.json({ error: "Request body required" }, { status: 400 });
   }
 
   const existing = await env.DB.prepare("SELECT * FROM quest_rewards WHERE id = ?").bind(params.id).first();
@@ -52,10 +57,9 @@ export async function onRequestPatch(context) {
 
 export async function onRequestDelete(context) {
   const { env, params, request } = context;
-  const body = await request.json().catch(() => null);
 
-  if (body?.pin !== EDIT_PIN) {
-    return Response.json({ error: "Incorrect PIN" }, { status: 403 });
+  if (!(await isParentAuthed(request))) {
+    return Response.json({ error: "Parent Mode required" }, { status: 403 });
   }
 
   await env.DB.prepare("DELETE FROM quest_rewards WHERE id = ?").bind(params.id).run();

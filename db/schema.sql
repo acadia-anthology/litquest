@@ -1,8 +1,31 @@
-CREATE TABLE IF NOT EXISTS players (
+-- A household is "one family" -- today there's only ever one row (this app is
+-- still single-PIN, single-family), but players and parents both hang off it
+-- so a future multi-family version doesn't need another schema migration.
+CREATE TABLE IF NOT EXISTS households (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- A parent is an admin identity (Mom, Dad, ...) -- separate from players,
+-- which are reading profiles. A parent who also wants to log their own
+-- reading gets an ordinary players row with parent_id pointing back here;
+-- most players (the kids) just have parent_id = NULL.
+CREATE TABLE IF NOT EXISTS parents (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  household_id INTEGER NOT NULL REFERENCES households(id),
+  name TEXT NOT NULL,
   avatar TEXT NOT NULL DEFAULT '🧑',
-  reader_type TEXT NOT NULL DEFAULT 'kid', -- kid | adult
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS players (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  household_id INTEGER NOT NULL REFERENCES households(id),
+  parent_id INTEGER REFERENCES parents(id), -- set only if this reading profile is a parent's own
+  name TEXT NOT NULL,
+  avatar TEXT NOT NULL DEFAULT '🧑',
+  reader_type TEXT NOT NULL DEFAULT 'kid', -- kid | adult -- scoring mode (see _lib/scoring.js), NOT a permission level
   total_points INTEGER NOT NULL DEFAULT 0,
   books_completed INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
