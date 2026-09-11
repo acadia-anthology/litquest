@@ -3,7 +3,7 @@
 // DELETE /api/books/:id  -> remove a book, rolling back any points it earned
 
 import { lookupBook } from "../../../_lib/booklookup.js";
-import { titleCase, normTitle } from "../../../_lib/titlecase.js";
+import { titleCase, normTitle, normalizeFancyText } from "../../../_lib/titlecase.js";
 import { PASS_THRESHOLD, scoreBook } from "../../../_lib/scoring.js";
 import { todayLocalDate } from "../../../_lib/date.js";
 
@@ -42,8 +42,8 @@ export async function onRequestPatch(context) {
 
   let title = book.title;
   let author = book.author;
-  if (typeof body.title === "string" && body.title.trim()) title = titleCase(body.title.trim());
-  if (body.author !== undefined) author = body.author?.trim() ? titleCase(body.author.trim()) : null;
+  if (typeof body.title === "string" && body.title.trim()) title = titleCase(normalizeFancyText(body.title).trim());
+  if (body.author !== undefined) author = body.author?.trim() ? titleCase(normalizeFancyText(body.author).trim()) : null;
 
   const titleOrAuthorChanged = title !== book.title || author !== book.author;
 

@@ -2,7 +2,7 @@
 // POST /api/books               { player_id, title, author, pages, level, lit_score,
 //                                  book_type, complexity, grade_level_num, added_at }
 
-import { titleCase, normTitle } from "../../_lib/titlecase.js";
+import { titleCase, normTitle, normalizeFancyText } from "../../_lib/titlecase.js";
 import { todayLocalDate } from "../../_lib/date.js";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -39,6 +39,9 @@ export async function onRequestPost(context) {
   if (!body.player_id) {
     return Response.json({ error: "player_id is required" }, { status: 400 });
   }
+
+  body.title = normalizeFancyText(body.title);
+  body.author = normalizeFancyText(body.author);
 
   // One entry per book per profile — check before anything else so a duplicate
   // doesn't burn a lookup/quiz-generation call for nothing.

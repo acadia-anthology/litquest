@@ -29,10 +29,15 @@
 import { findOpenLibraryBook, subjectHint } from "./openlibrary.js";
 import { findGoogleBook } from "./googlebooks.js";
 import { findGoodreadsBook } from "./goodreads.js";
+import { normalizeFancyText } from "./titlecase.js";
 
 export async function lookupBook(env, rawTitleInput, rawAuthorInput) {
-  const rawTitle = rawTitleInput?.trim();
-  const rawAuthor = rawAuthorInput?.trim();
+  // A pasted fancy-font title ("𝐈 𝐬𝐮𝐫𝐯𝐢𝐯𝐞𝐝...") would otherwise fail every
+  // external source (Open Library/Google Books don't recognize those codepoints
+  // as the plain letters they visually resemble) and also dodge the caller's
+  // own duplicate-title check, which strips non-ASCII entirely.
+  const rawTitle = normalizeFancyText(rawTitleInput)?.trim();
+  const rawAuthor = normalizeFancyText(rawAuthorInput)?.trim();
   if (!rawTitle) return { error: "title is required" };
   if (!env.GROQ_API_KEY) return { error: "Server is missing GROQ_API_KEY" };
 
