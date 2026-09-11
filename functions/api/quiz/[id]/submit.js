@@ -2,6 +2,7 @@
 // Grades the quiz, awards points on a passing score (>=80%), updates the book's player.
 
 import { PASS_THRESHOLD, scoreBook } from "../../../_lib/scoring.js";
+import { todayLocalDate } from "../../../_lib/date.js";
 
 export async function onRequestPost(context) {
   const { env, params, request } = context;
@@ -55,7 +56,7 @@ export async function onRequestPost(context) {
     await env.DB.prepare(
       "UPDATE books SET status = 'completed', finished_at = COALESCE(finished_at, ?) WHERE id = ?"
     )
-      .bind(new Date().toISOString().slice(0, 10), quiz.book_id)
+      .bind(todayLocalDate(), quiz.book_id)
       .run();
     await env.DB.prepare(
       "UPDATE players SET total_points = total_points + ?, books_completed = books_completed + 1 WHERE id = ?"

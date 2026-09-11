@@ -5,6 +5,7 @@
 import { lookupBook } from "../../../_lib/booklookup.js";
 import { titleCase, normTitle } from "../../../_lib/titlecase.js";
 import { PASS_THRESHOLD, scoreBook } from "../../../_lib/scoring.js";
+import { todayLocalDate } from "../../../_lib/date.js";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -30,6 +31,13 @@ export async function onRequestPatch(context) {
   }
   if (finishedAt !== null && !DATE_RE.test(finishedAt)) {
     return Response.json({ error: "finished_at must be a YYYY-MM-DD date or null" }, { status: 400 });
+  }
+  const today = todayLocalDate();
+  if (addedAt > today) {
+    return Response.json({ error: "added_at can't be in the future" }, { status: 400 });
+  }
+  if (finishedAt !== null && finishedAt > today) {
+    return Response.json({ error: "finished_at can't be in the future" }, { status: 400 });
   }
 
   let title = book.title;

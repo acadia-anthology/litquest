@@ -3,11 +3,12 @@
 //                                  book_type, complexity, grade_level_num, added_at }
 
 import { titleCase, normTitle } from "../../_lib/titlecase.js";
+import { todayLocalDate } from "../../_lib/date.js";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 function todayDate() {
-  return new Date().toISOString().slice(0, 10);
+  return todayLocalDate();
 }
 
 export async function onRequestGet(context) {
@@ -73,11 +74,18 @@ export async function onRequestPost(context) {
   const bookType = ["Elementary", "Middle Grade", "YA", "Adult"].includes(body.book_type) ? body.book_type : null;
   const complexity = ["Light", "Standard", "Complex"].includes(body.complexity) ? body.complexity : null;
 
-  const addedAt = DATE_RE.test(body.added_at) ? body.added_at : todayDate();
+  const today = todayDate();
+  const addedAt = DATE_RE.test(body.added_at) ? body.added_at : today;
+  if (addedAt > today) {
+    return Response.json({ error: "Date started can't be in the future" }, { status: 400 });
+  }
 
   // Logging an already-read backlog book: goes straight to Quiz Ready with its real
   // finish date on file — the quiz there is optional, just for bonus points.
   const alreadyFinished = DATE_RE.test(body.finished_at);
+  if (alreadyFinished && body.finished_at > today) {
+    return Response.json({ error: "Date finished can't be in the future" }, { status: 400 });
+  }
   const status = alreadyFinished ? "quiz_ready" : "reading";
   const finishedAt = alreadyFinished ? body.finished_at : null;
 

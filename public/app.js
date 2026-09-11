@@ -507,8 +507,8 @@ function toggleDateEditor(cardEl, book) {
   form.innerHTML = `
     <label>Title <input type="text" value="${escapeHtml(book.title)}" class="edit-title" /></label>
     <label>Author <input type="text" value="${escapeHtml(book.author || "")}" class="edit-author" /></label>
-    <label>Started <input type="date" value="${book.added_at || ""}" class="edit-started" /></label>
-    <label>Finished <input type="date" value="${book.finished_at || ""}" class="edit-finished" /></label>
+    <label>Started <input type="date" value="${book.added_at || ""}" max="${todayISO()}" class="edit-started" /></label>
+    <label>Finished <input type="date" value="${book.finished_at || ""}" max="${todayISO()}" class="edit-finished" /></label>
     <p class="lookup-status edit-status" hidden></p>
     <div class="row-actions">
       <button type="button" class="btn edit-cancel">Cancel</button>
@@ -630,11 +630,20 @@ const alreadyFinishedHint = document.getElementById("alreadyFinishedHint");
 const addBookSubmitBtn = document.getElementById("addBookSubmitBtn");
 
 function todayISO() {
-  return new Date().toISOString().slice(0, 10);
+  // UTC would already be tomorrow by ~8pm Eastern, letting a same-evening
+  // submission slip a tomorrow's-date entry past a same-day check.
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/New_York",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
 }
 
 function resetAddBookForm() {
   addBookForm.reset();
+  startedInput.max = todayISO();
+  finishedInput.max = todayISO();
   startedInput.value = todayISO();
   finishedInput.value = todayISO();
   finishedDateRow.hidden = true;
